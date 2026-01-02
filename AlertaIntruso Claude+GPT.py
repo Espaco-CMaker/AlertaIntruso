@@ -200,11 +200,12 @@ MAX_THUMBS = 200
 
 # ----------------------------- Telegram -----------------------------
 class TelegramBot:
-    def __init__(self, token: str, chat_id: str):
+    def __init__(self, token: str, chat_id: str, log: LogManager = None):
         self.token = (token or "").strip()
         self.chat_id = (chat_id or "").strip()
         self.enabled = bool(self.token and self.chat_id)
         self.base_url = f"https://api.telegram.org/bot{self.token}" if self.enabled else ""
+        self.log = log
 
     def enviar_mensagem(self, texto: str) -> bool:
         if not self.enabled:
@@ -214,7 +215,9 @@ class TelegramBot:
             data = {"chat_id": self.chat_id, "text": texto}
             r = requests.post(url, data=data, timeout=10)
             return r.status_code == 200
-        except Exception:
+        except Exception as e:
+            if self.log:
+                self.log.log("ERROR", f"Erro ao enviar mensagem Telegram: {e}")
             return False
 
     def enviar_foto(self, foto_path: str, caption: str = "") -> bool:
@@ -227,7 +230,9 @@ class TelegramBot:
                 data = {"chat_id": self.chat_id, "caption": caption}
                 r = requests.post(url, files=files, data=data, timeout=30)
             return r.status_code == 200
-        except Exception:
+        except Exception as e:
+            if self.log:
+                self.log.log("ERROR", f"Erro ao enviar foto Telegram: {e}")
             return False
 
 
@@ -441,8 +446,8 @@ class RTSPObjectDetector:
             try:
                 if self.cap is not None:
                     self.cap.release()
-            except Exception:
-                pass
+            except Exception as e:
+                self.log.log("WARN", f"Erro ao liberar cap antigo: {e}", self.cam_id)
 
             cap = cv2.VideoCapture()  # cria vazio
 
@@ -539,9 +544,8 @@ class RTSPObjectDetector:
         if self.photo_callback:
             try:
                 self.photo_callback(self.cam_id, str(path), ts, event_uid, shot_idx)
-
-            except Exception:
-                pass
+            except Exception as e:
+                self.log.log("ERROR", f"Erro no callback de foto: {e}", self.cam_id)
 
         # Telegram: continua enviando foto em detections/all (start/stop ficam na UI)
         if self.telegram_mode in ("all", "detections") and self.telegram.enabled:
@@ -568,8 +572,8 @@ class RTSPObjectDetector:
         try:
             if self.cap is not None:
                 self.cap.release()
-        except Exception:
-            pass
+        except Exception as e:
+            self.log.log("WARN", f"Erro ao liberar cap durante soft reconnect: {e}", self.cam_id)
 
         ok = self._connect()
         if ok:
@@ -631,8 +635,8 @@ class RTSPObjectDetector:
                         try:
                             if self.cap is not None:
                                 self.cap.release()
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            self.log.log("WARN", f"Erro ao liberar cap durante reconnect: {e}", self.cam_id)
 
                         ok = self._connect()
                         if ok:
@@ -723,8 +727,8 @@ class RTSPObjectDetector:
                 if self.frame_callback:
                     try:
                         self.frame_callback(self.cam_id, frame_draw)
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        self.log.log("ERROR", f"Erro no callback de frame: {e}", self.cam_id)
 
                 if frame_count % 200 == 0:
                     self.log.log("INFO", f"Frames processados: {frame_count}", self.cam_id)
@@ -734,8 +738,8 @@ class RTSPObjectDetector:
             try:
                 if self.cap is not None:
                     self.cap.release()
-            except Exception:
-                pass
+            except Exception as e:
+                self.log.log("WARN", f"Erro ao liberar cap no cleanup: {e}", self.cam_id)
 
             self.log.log("INFO", "Thread encerrada.", self.cam_id)
 
@@ -765,7 +769,7 @@ class InterfaceGrafica:
         # Telegram
         token = self.config["TELEGRAM"].get("bot_token", "")
         chat_id = self.config["TELEGRAM"].get("chat_id", "")
-        self.telegram = TelegramBot(token, chat_id)
+        self.telegram = TelegramBot(token, chat_id, self.log)
 
         # Detectors
         self.detectors = {}     # cam_id -> RTSPObjectDetector
@@ -1311,7 +1315,7 @@ class InterfaceGrafica:
         # atualizar Telegram do config
         token = self.config["TELEGRAM"].get("bot_token", "")
         chat_id = self.config["TELEGRAM"].get("chat_id", "")
-        self.telegram = TelegramBot(token, chat_id)
+        self.telegram = TelegramBot(token, chat_id, self.log)
 
         # parar qualquer resquício
         self.stop_system(silent=True)
@@ -1436,7 +1440,7 @@ class InterfaceGrafica:
         # telegram atual
         token = self.config["TELEGRAM"].get("bot_token", "")
         chat_id = self.config["TELEGRAM"].get("chat_id", "")
-        self.telegram = TelegramBot(token, chat_id)
+        self.telegram = TelegramBot(token, chat_id, self.log)
 
         try:
             new_det = RTSPObjectDetector(cam_id, url, self.log, self.telegram)
