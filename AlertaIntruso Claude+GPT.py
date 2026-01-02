@@ -178,7 +178,12 @@ from datetime import datetime
 from pathlib import Path
 import time
 import platform
-import psutil
+try:
+    import psutil
+    PSUTIL_AVAILABLE = True
+except ImportError:
+    psutil = None
+    PSUTIL_AVAILABLE = False
 
 import tkinter as tk
 from tkinter import ttk, scrolledtext, messagebox
@@ -742,8 +747,12 @@ class RTSPObjectDetector:
                 if frame_count % 200 == 0:
                     elapsed = time.time() - start_time
                     fps = frame_count / elapsed if elapsed > 0 else 0
-                    cpu_percent = psutil.cpu_percent(interval=None)
-                    ram_percent = psutil.virtual_memory().percent
+                    if PSUTIL_AVAILABLE:
+                        cpu_percent = psutil.cpu_percent(interval=None)
+                        ram_percent = psutil.virtual_memory().percent
+                    else:
+                        cpu_percent = 0.0
+                        ram_percent = 0.0
                     avg_inf = sum(self.inf_times) / len(self.inf_times) if self.inf_times else 0
                     gpu_info = "CUDA" if cv2.cuda.getCudaEnabledDeviceCount() > 0 else "CPU"
                     self.log.log("INFO", f"PERFORMANCE | Frames: {frame_count} | FPS: {fps:.2f} | CPU: {cpu_percent:.1f}% | RAM: {ram_percent:.1f}% | InfTime: {avg_inf:.3f}s | GPU: {gpu_info} | v{APP_VERSION}", self.cam_id)
