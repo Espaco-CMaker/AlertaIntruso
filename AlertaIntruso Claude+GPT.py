@@ -178,6 +178,7 @@ from datetime import datetime
 from pathlib import Path
 import time
 import platform
+import psutil
 
 import tkinter as tk
 from tkinter import ttk, scrolledtext, messagebox
@@ -314,6 +315,8 @@ class RTSPObjectDetector:
 
         self.frame_callback = None
         self.photo_callback = None
+
+        self.inf_times = []
 
         # Config runtime
         self.cooldown_s = 2.0
@@ -480,10 +483,12 @@ class RTSPObjectDetector:
 
 
     def _detect(self, frame_bgr):
+        start_inf = time.time()
         h, w = frame_bgr.shape[:2]
         blob = cv2.dnn.blobFromImage(frame_bgr, 1/255.0, (self.input_size, self.input_size), swapRB=True, crop=False)
         self.net.setInput(blob)
         outs = self.net.forward(self.output_layers)
+        inf_time = time.time() - start_inf
 
         boxes, confs, cids = [], [], []
         for out in outs:
@@ -509,7 +514,8 @@ class RTSPObjectDetector:
                 f_boxes.append(boxes[i])
                 f_confs.append(confs[i])
                 f_cids.append(cids[i])
-        return f_boxes, f_confs, f_cids
+        inf_time = time.time() - start_inf
+        return f_boxes, f_confs, f_cids, inf_time
 
     def _draw_boxes(self, frame_bgr, boxes, confs, cids):
         out = frame_bgr.copy()
@@ -607,6 +613,7 @@ class RTSPObjectDetector:
             # RTSP OK -> loga config efetiva
             self._log_detector_config()
             frame_count = 0
+            start_time = time.time()
 
             # 2) Loop principal
             while self.running:
@@ -663,7 +670,8 @@ class RTSPObjectDetector:
                     continue
 
                 # detecção
-                boxes, confs, cids = self._detect(frame)
+                boxes, confs, cids, inf_time = self._detect(frame)
+                self.inf_times.append(inf_time)
                 frame_draw = self._draw_boxes(frame, boxes, confs, cids)
      
                 if boxes and (not self._person_present(cids)):
@@ -732,7 +740,14 @@ class RTSPObjectDetector:
                         self.log.log("ERROR", f"Erro no callback de frame: {e}", self.cam_id)
 
                 if frame_count % 200 == 0:
-                    self.log.log("INFO", f"Frames processados: {frame_count}", self.cam_id)
+                    elapsed = time.time() - start_time
+                    fps = frame_count / elapsed if elapsed > 0 else 0
+                    cpu_percent = psutil.cpu_percent(interval=None)
+                    ram_percent = psutil.virtual_memory().percent
+                    avg_inf = sum(self.inf_times) / len(self.inf_times) if self.inf_times else 0
+                    gpu_info = "CUDA" if cv2.cuda.getCudaEnabledDeviceCount() > 0 else "CPU"
+                    self.log.log("INFO", f"PERFORMANCE | Frames: {frame_count} | FPS: {fps:.2f} | CPU: {cpu_percent:.1f}% | RAM: {ram_percent:.1f}% | InfTime: {avg_inf:.3f}s | GPU: {gpu_info} | v{APP_VERSION}", self.cam_id)
+                    self.inf_times.clear()
 
         finally:
             # 3) Cleanup garantido: aqui é o lugar seguro de liberar o cap
@@ -764,7 +779,10 @@ class InterfaceGrafica:
 )
 
         # Capturar logs do OpenCV (incluindo FFmpeg)
-        cv2.setLogCallback(lambda level, msg: self.log.log("INFO", f"OpenCV [{level}]: {msg.strip()}"))
+        try:
+            cv2.setLogCallback(lambda level, msg: self.log.log("INFO", f"OpenCV [{level}]: {msg.strip()}"))
+        except AttributeError:
+            self.log.log("WARN", "cv2.setLogCallback não disponível nesta versão do OpenCV. Logs do OpenCV não serão capturados.")
 
         # Capturar stderr para logs de FFmpeg não capturados pelo OpenCV
         self.old_stderr = sys.stderr
