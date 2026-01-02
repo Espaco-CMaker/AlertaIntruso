@@ -4,7 +4,7 @@ ALERTAINTRUSO — ALARME INTELIGENTE POR VISÃO COMPUTACIONAL (RTSP • YOLO •
 ================================================================================
 Arquivo:        AlertaIntruso Claude+GPT.py
 Projeto:        Sistema de Alarme Inteligente por Visão Computacional
-Versão:         3.9.1
+Versão:         3.9.3
 Data:           01/01/2026
 Autor:          Fabio Bettio
 Licença:        Uso educacional / experimental
@@ -201,7 +201,7 @@ os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = (
 
 
 
-APP_VERSION = "3.9.2"
+APP_VERSION = "3.9.3"
 MAX_THUMBS = 200
 
 
@@ -709,6 +709,7 @@ class RTSPObjectDetector:
                         self._pending_shots = int(max(1, self.photos_per_event))
                         self._last_event_time = now
                         self._last_shot_time = 0.0
+                        self.detections_total += 1
                         person_count = sum(1 for cid in cids if cid == 0)
                         conf_avg = (sum(confs) / len(confs)) if confs else 0.0
 
@@ -756,7 +757,7 @@ class RTSPObjectDetector:
                         ram_percent = 0.0
                     avg_inf = sum(self.inf_times) / len(self.inf_times) if self.inf_times else 0
                     gpu_info = "CUDA" if cv2.cuda.getCudaEnabledDeviceCount() > 0 else "CPU"
-                    self.last_performance = {'fps': fps, 'cpu': cpu_percent, 'ram': ram_percent, 'inf_time': avg_inf, 'gpu': gpu_info}
+                    self.last_performance = {'fps': fps, 'cpu': cpu_percent, 'ram': ram_percent, 'inf_time': avg_inf, 'gpu': gpu_info, 'detections': self.detections_total}
                     self.log.log("INFO", f"PERFORMANCE | Frames: {frame_count} | FPS: {fps:.2f} | CPU: {cpu_percent:.1f}% | RAM: {ram_percent:.1f}% | InfTime: {avg_inf:.3f}s | GPU: {gpu_info} | v{APP_VERSION}", self.cam_id)
                     self.inf_times.clear()
 
@@ -854,6 +855,11 @@ class InterfaceGrafica:
         self.frame_logs = ttk.Frame(self.notebook)
         self.notebook.add(self.frame_logs, text="Logs")
         self._build_logs_tab()
+
+        # ABA PERFORMANCE
+        self.frame_performance = ttk.Frame(self.notebook)
+        self.notebook.add(self.frame_performance, text="Performance")
+        self._build_performance_tab()
 
         # ABA SOBRE
         self.frame_about = ttk.Frame(self.notebook)
@@ -1139,28 +1145,27 @@ class InterfaceGrafica:
 
     def _build_performance_tab(self):
         self.log.log("INFO", "Building performance tab")
-        self.perf_labels = {}
+        # Criar Treeview para tabela profissional
+        columns = ("Câmera", "FPS", "CPU", "RAM", "InfTime", "Detecções", "GPU")
+        self.perf_tree = ttk.Treeview(self.frame_performance, columns=columns, show="headings", height=6)
+        
+        # Configurar headings
+        for col in columns:
+            self.perf_tree.heading(col, text=col)
+            self.perf_tree.column(col, width=100, anchor="center")
+        
+        # Scrollbar
+        scrollbar = ttk.Scrollbar(self.frame_performance, orient="vertical", command=self.perf_tree.yview)
+        self.perf_tree.configure(yscrollcommand=scrollbar.set)
+        
+        # Pack
+        self.perf_tree.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+        
+        # Inserir linhas iniciais
         for cam in range(1, 5):
-            ttk.Label(self.frame_performance, text=f"Câmera {cam}", font=("Arial", 12, "bold")).grid(row=cam-1, column=0, padx=10, pady=5, sticky="w")
-            self.perf_labels[cam] = {
-                'fps': ttk.Label(self.frame_performance, text="FPS: --", font=("Arial", 10)),
-                'cpu': ttk.Label(self.frame_performance, text="CPU: --%", font=("Arial", 10)),
-                'ram': ttk.Label(self.frame_performance, text="RAM: --%", font=("Arial", 10)),
-                'inf_time': ttk.Label(self.frame_performance, text="InfTime: --s", font=("Arial", 10)),
-                'gpu': ttk.Label(self.frame_performance, text="GPU: --", font=("Arial", 10)),
-            }
-            col = 1
-            for key in ['fps', 'cpu', 'ram', 'inf_time', 'gpu']:
-                self.perf_labels[cam][key].grid(row=cam-1, column=col, padx=10, pady=2, sticky="w")
-                col += 1
-        # Global
-        ttk.Label(self.frame_performance, text="Sistema", font=("Arial", 12, "bold")).grid(row=4, column=0, padx=10, pady=5, sticky="w")
-        self.global_labels = {
-            'cpu': ttk.Label(self.frame_performance, text="CPU: --%", font=("Arial", 10)),
-            'ram': ttk.Label(self.frame_performance, text="RAM: --%", font=("Arial", 10)),
-        }
-        self.global_labels['cpu'].grid(row=4, column=1, padx=10, pady=2, sticky="w")
-        self.global_labels['ram'].grid(row=4, column=2, padx=10, pady=2, sticky="w")
+            self.perf_tree.insert("", "end", iid=f"cam{cam}", values=(f"Câmera {cam}", "--", "--", "--", "--", "--", "--"))
+        self.perf_tree.insert("", "end", iid="system", values=("Sistema", "--", "--", "--", "--", "--", "--"))
 
     def _update_performance(self):
         try:
@@ -1175,26 +1180,45 @@ class InterfaceGrafica:
                     ram = perf.get('ram', 0)
                     inf_time = perf.get('inf_time', 0)
                     gpu = perf.get('gpu', 'CPU')
+                    detections = perf.get('detections', 0)
                     
-                    # Update labels with color
-                    self.perf_labels[cam]['fps'].config(text=f"FPS: {fps:.2f}", foreground='red' if fps < 10 else 'green')
-                    self.perf_labels[cam]['cpu'].config(text=f"CPU: {cpu:.1f}%", foreground='red' if cpu > 80 else 'green')
-                    self.perf_labels[cam]['ram'].config(text=f"RAM: {ram:.1f}%", foreground='red' if ram > 80 else 'green')
-                    self.perf_labels[cam]['inf_time'].config(text=f"InfTime: {inf_time:.3f}s", foreground='red' if inf_time > 0.1 else 'green')
-                    self.perf_labels[cam]['gpu'].config(text=f"GPU: {gpu}", foreground='blue')
+                    # Cores baseadas em thresholds (usar texto simples)
+                    fps_text = f"{fps:.2f}" + (" (Baixo)" if fps < 10 else "")
+                    cpu_text = f"{cpu:.1f}%" + (" (Alto)" if cpu > 80 else "")
+                    ram_text = f"{ram:.1f}%" + (" (Alto)" if ram > 80 else "")
+                    inf_text = f"{inf_time:.3f}s" + (" (Lento)" if inf_time > 0.1 else "")
+                    
+                    # Atualizar linha
+                    self.perf_tree.item(f"cam{cam}", values=(
+                        f"Câmera {cam}",
+                        fps_text,
+                        cpu_text,
+                        ram_text,
+                        inf_text,
+                        f"{detections}",
+                        gpu
+                    ))
                     
                     global_cpu += cpu
                     global_ram += ram
                     count += 1
                 else:
-                    for key in self.perf_labels[cam]:
-                        self.perf_labels[cam][key].config(text=f"{key.upper()}: --", foreground='gray')
+                    self.perf_tree.item(f"cam{cam}", values=(f"Câmera {cam}", "--", "--", "--", "--", "--", "--"))
             
             if count > 0:
                 global_cpu /= count
                 global_ram /= count
-            self.global_labels['cpu'].config(text=f"CPU: {global_cpu:.1f}%", foreground='red' if global_cpu > 80 else 'green')
-            self.global_labels['ram'].config(text=f"RAM: {global_ram:.1f}%", foreground='red' if global_ram > 80 else 'green')
+            cpu_color = "🔴" if global_cpu > 80 else "🟢"
+            ram_color = "🔴" if global_ram > 80 else "🟢"
+            self.perf_tree.item("system", values=(
+                "Sistema",
+                "--",
+                f"{cpu_color} {global_cpu:.1f}%",
+                f"{ram_color} {global_ram:.1f}%",
+                "--",
+                "--",
+                "--"
+            ))
         except Exception as e:
             self.log.log("ERROR", f"Erro ao atualizar performance: {e}")
         

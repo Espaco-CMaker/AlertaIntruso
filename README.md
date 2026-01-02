@@ -1,6 +1,6 @@
 # AlertaIntruso - Sistema de Alarme Inteligente por Visão Computacional
 
-**Versão Atual no GitHub: 3.9.2** (01/01/2026)
+**Versão Atual no GitHub: 3.9.3** (01/01/2026)
 
 ## Descrição Geral
 
@@ -55,9 +55,10 @@ O **AlertaIntruso** é uma aplicação desktop em Python desenvolvida para monit
 - Rotação automática
 
 ### Performance
-- Painel em tempo real com métricas por câmera
-- FPS, CPU%, RAM%, Tempo de Inferência, GPU
-- Alertas visuais para valores críticos
+- Tabela profissional em tempo real com métricas por câmera
+- FPS, CPU%, RAM%, Tempo de Inferência, Detecções Totais, GPU
+- Alertas visuais para valores críticos (baixo FPS, alto CPU/RAM, inferência lenta)
+- Média do sistema para CPU e RAM
 
 ## Resiliência RTSP/OpenCV
 
@@ -100,12 +101,18 @@ Edite `config.ini`:
 
 ## Desenvolvimento
 
-- **Versão**: 3.9.2
+- **Versão**: 3.9.3
 - **Data**: 01/01/2026
 - **Autor**: Fabio Bettio
 - **Licença**: Uso educacional/experimental
 
 ## Changelog
+
+### v3.9.3 (01/01/2026)
+- Aba "Performance" redesenhada com tabela profissional (Treeview)
+- Adicionado contador de detecções totais por câmera
+- Interface mais profissional com colunas organizadas
+- Alertas visuais baseados em thresholds (FPS baixo, CPU/RAM alto, inferência lenta)
 
 ### v3.9.2 (01/01/2026)
 - Aba "Sobre" com versão, autor, data e link do GitHub
