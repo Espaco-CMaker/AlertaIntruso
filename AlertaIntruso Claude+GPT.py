@@ -529,7 +529,7 @@ class RTSPObjectDetector:
         self.log.log(
             "INFO",
             "SHOT | "
-            f"evt={event_id} | shot={shot_idx}/{self.photos_per_event} | "
+            f"evt={self._event_uid} | shot={shot_idx}/{self.photos_per_event} | "
             f"pessoas={person_count} | conf_avg={conf_avg:.2f} | "
             f"arquivo={filename} | v{APP_VERSION}",
             self.cam_id
@@ -700,7 +700,7 @@ class RTSPObjectDetector:
                         self.log.log(
                             "WARN",
                             "EVENTO MOVIMENTO/DETECCAO | "
-                            f"evt={self._event_id} | pessoas={person_count} | boxes={total_boxes} | "
+                            f"evt={self._event_uid} | pessoas={person_count} | boxes={total_boxes} | "
                             f"conf_avg={conf_avg:.2f} | conf_max={best_conf:.2f} | "
                             f"cooldown={self.cooldown_s:.2f}s | conf_th={self.conf_th:.2f} | nms_th={self.nms_th:.2f} | "
                             f"photos={self._pending_shots} | min_shot_interval={self._min_shot_interval:.2f}s | v{APP_VERSION}",
