@@ -179,7 +179,7 @@ from pathlib import Path
 import time
 import platform
 try:
-    import psutil
+    import psutil  # type: ignore
     PSUTIL_AVAILABLE = True
 except ImportError:
     psutil = None
