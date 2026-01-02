@@ -201,7 +201,7 @@ os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = (
 
 
 
-APP_VERSION = "3.9.1"
+APP_VERSION = "3.9.2"
 MAX_THUMBS = 200
 
 
@@ -855,6 +855,11 @@ class InterfaceGrafica:
         self.notebook.add(self.frame_logs, text="Logs")
         self._build_logs_tab()
 
+        # ABA SOBRE
+        self.frame_about = ttk.Frame(self.notebook)
+        self.notebook.add(self.frame_about, text="Sobre")
+        self._build_about_tab()
+
         self._load_logs_tail()
 
         self.root.after(1000, self._update_performance)
@@ -1133,6 +1138,7 @@ class InterfaceGrafica:
         ttk.Button(self.frame_logs, text="Limpar", command=lambda: self.text_logs.delete("1.0", tk.END)).pack(pady=4)
 
     def _build_performance_tab(self):
+        self.log.log("INFO", "Building performance tab")
         self.perf_labels = {}
         for cam in range(1, 5):
             ttk.Label(self.frame_performance, text=f"Câmera {cam}", font=("Arial", 12, "bold")).grid(row=cam-1, column=0, padx=10, pady=5, sticky="w")
@@ -1193,6 +1199,13 @@ class InterfaceGrafica:
             self.log.log("ERROR", f"Erro ao atualizar performance: {e}")
         
         self.root.after(1000, self._update_performance)
+
+    def _build_about_tab(self):
+        ttk.Label(self.frame_about, text=f"Versão: {APP_VERSION}", font=("Arial", 12, "bold")).pack(pady=10)
+        ttk.Label(self.frame_about, text="Autor: Fabio Bettio", font=("Arial", 10)).pack(pady=5)
+        ttk.Label(self.frame_about, text="Data: 01/01/2026", font=("Arial", 10)).pack(pady=5)
+        ttk.Label(self.frame_about, text="GitHub: https://github.com/Espaco-CMaker/AlertaIntruso", font=("Arial", 10)).pack(pady=5)
+        ttk.Label(self.frame_about, text="Licença: Uso educacional/experimental", font=("Arial", 10)).pack(pady=5)
 
     # ---------------- LOG UI ----------------
     def _log_to_ui(self, line: str):
