@@ -1,6 +1,6 @@
 # AlertaIntruso - Sistema de Alarme Inteligente por Visão Computacional
 
-**Versão Atual no GitHub: 3.9.1** (01/01/2026)
+**Versão Atual no GitHub: 3.9.2** (01/01/2026)
 
 ## Descrição Geral
 
@@ -100,12 +100,16 @@ Edite `config.ini`:
 
 ## Desenvolvimento
 
-- **Versão**: 3.9.1
+- **Versão**: 3.9.2
 - **Data**: 01/01/2026
 - **Autor**: Fabio Bettio
 - **Licença**: Uso educacional/experimental
 
 ## Changelog
+
+### v3.9.2 (01/01/2026)
+- Aba "Sobre" com versão, autor, data e link do GitHub
+- Incremento automático de microversão para alterações
 
 ### v3.9.1 (01/01/2026)
 - Log detalhado de eventos com parâmetros ativos
