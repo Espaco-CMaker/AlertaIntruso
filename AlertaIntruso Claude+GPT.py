@@ -166,6 +166,7 @@ v3.8.0
 
 
 import os
+import sys
 import cv2
 import numpy as np
 import threading
@@ -762,6 +763,16 @@ class InterfaceGrafica:
         self.log.log("INFO",f"Inicializando sistema | AlertaIntruso v{APP_VERSION} | Python {platform.python_version()} | OpenCV {cv2.__version__}"
 )
 
+        # Capturar logs do OpenCV (incluindo FFmpeg)
+        cv2.setLogCallback(lambda level, msg: self.log.log("INFO", f"OpenCV [{level}]: {msg.strip()}"))
+
+        # Capturar stderr para logs de FFmpeg não capturados pelo OpenCV
+        self.old_stderr = sys.stderr
+        r, w = os.pipe()
+        self.stderr_r = os.fdopen(r, 'r')
+        sys.stderr = os.fdopen(w, 'w')
+        threading.Thread(target=self._read_stderr, daemon=True).start()
+
 
 
         self._load_or_create_config()
@@ -829,6 +840,13 @@ class InterfaceGrafica:
 
         # Fechamento
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
+
+    def _read_stderr(self):
+        try:
+            for line in self.stderr_r:
+                self.log.log("WARN", f"STDERR: {line.strip()}")
+        except Exception:
+            pass
 
     # ---------------- CONFIG ----------------
     def _load_or_create_config(self):
