@@ -1,5 +1,7 @@
 # AlertaIntruso - Sistema de Alarme Inteligente por Visão Computacional
 
+**Versão Atual no GitHub: 3.9.1** (01/01/2026)
+
 ## Descrição Geral
 
 O **AlertaIntruso** é uma aplicação desktop em Python desenvolvida para monitoramento contínuo (24/7) de múltiplas câmeras IP via RTSP, utilizando detecção de pessoas com OpenCV DNN (YOLOv4-tiny). O sistema prioriza robustez operacional, tolerância a falhas de stream, controle de falsos positivos e rastreabilidade completa de eventos de movimento.
