@@ -2,7 +2,7 @@
 ================================================================================
 ALERTAINTRUSO — ALARME INTELIGENTE POR VISÃO COMPUTACIONAL (RTSP • YOLO • MULTICAM)
 ================================================================================
-Arquivo:        AlertaIntruso_V3.9.1.py
+Arquivo:        AlertaIntruso Claude+GPT.py
 Projeto:        Sistema de Alarme Inteligente por Visão Computacional
 Versão:         3.9.1
 Data:           01/01/2026
