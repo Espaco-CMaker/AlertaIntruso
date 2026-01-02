@@ -322,6 +322,7 @@ class RTSPObjectDetector:
         self.photo_callback = None
 
         self.inf_times = []
+        self.last_performance = {}
 
         # Config runtime
         self.cooldown_s = 2.0
@@ -755,6 +756,7 @@ class RTSPObjectDetector:
                         ram_percent = 0.0
                     avg_inf = sum(self.inf_times) / len(self.inf_times) if self.inf_times else 0
                     gpu_info = "CUDA" if cv2.cuda.getCudaEnabledDeviceCount() > 0 else "CPU"
+                    self.last_performance = {'fps': fps, 'cpu': cpu_percent, 'ram': ram_percent, 'inf_time': avg_inf, 'gpu': gpu_info}
                     self.log.log("INFO", f"PERFORMANCE | Frames: {frame_count} | FPS: {fps:.2f} | CPU: {cpu_percent:.1f}% | RAM: {ram_percent:.1f}% | InfTime: {avg_inf:.3f}s | GPU: {gpu_info} | v{APP_VERSION}", self.cam_id)
                     self.inf_times.clear()
 
@@ -854,6 +856,8 @@ class InterfaceGrafica:
         self._build_logs_tab()
 
         self._load_logs_tail()
+
+        self.root.after(1000, self._update_performance)
 
         self._process_queues()
         self.log.log("INFO", f"Interface pronta v{APP_VERSION}")
@@ -1127,6 +1131,68 @@ class InterfaceGrafica:
         self.text_logs = scrolledtext.ScrolledText(self.frame_logs, wrap=tk.WORD, font=("Courier", 9))
         self.text_logs.pack(fill="both", expand=True, padx=6, pady=6)
         ttk.Button(self.frame_logs, text="Limpar", command=lambda: self.text_logs.delete("1.0", tk.END)).pack(pady=4)
+
+    def _build_performance_tab(self):
+        self.perf_labels = {}
+        for cam in range(1, 5):
+            ttk.Label(self.frame_performance, text=f"Câmera {cam}", font=("Arial", 12, "bold")).grid(row=cam-1, column=0, padx=10, pady=5, sticky="w")
+            self.perf_labels[cam] = {
+                'fps': ttk.Label(self.frame_performance, text="FPS: --", font=("Arial", 10)),
+                'cpu': ttk.Label(self.frame_performance, text="CPU: --%", font=("Arial", 10)),
+                'ram': ttk.Label(self.frame_performance, text="RAM: --%", font=("Arial", 10)),
+                'inf_time': ttk.Label(self.frame_performance, text="InfTime: --s", font=("Arial", 10)),
+                'gpu': ttk.Label(self.frame_performance, text="GPU: --", font=("Arial", 10)),
+            }
+            col = 1
+            for key in ['fps', 'cpu', 'ram', 'inf_time', 'gpu']:
+                self.perf_labels[cam][key].grid(row=cam-1, column=col, padx=10, pady=2, sticky="w")
+                col += 1
+        # Global
+        ttk.Label(self.frame_performance, text="Sistema", font=("Arial", 12, "bold")).grid(row=4, column=0, padx=10, pady=5, sticky="w")
+        self.global_labels = {
+            'cpu': ttk.Label(self.frame_performance, text="CPU: --%", font=("Arial", 10)),
+            'ram': ttk.Label(self.frame_performance, text="RAM: --%", font=("Arial", 10)),
+        }
+        self.global_labels['cpu'].grid(row=4, column=1, padx=10, pady=2, sticky="w")
+        self.global_labels['ram'].grid(row=4, column=2, padx=10, pady=2, sticky="w")
+
+    def _update_performance(self):
+        try:
+            global_cpu = 0.0
+            global_ram = 0.0
+            count = 0
+            for cam in range(1, 5):
+                if cam in self.detectors and hasattr(self.detectors[cam], 'last_performance'):
+                    perf = self.detectors[cam].last_performance
+                    fps = perf.get('fps', 0)
+                    cpu = perf.get('cpu', 0)
+                    ram = perf.get('ram', 0)
+                    inf_time = perf.get('inf_time', 0)
+                    gpu = perf.get('gpu', 'CPU')
+                    
+                    # Update labels with color
+                    self.perf_labels[cam]['fps'].config(text=f"FPS: {fps:.2f}", foreground='red' if fps < 10 else 'green')
+                    self.perf_labels[cam]['cpu'].config(text=f"CPU: {cpu:.1f}%", foreground='red' if cpu > 80 else 'green')
+                    self.perf_labels[cam]['ram'].config(text=f"RAM: {ram:.1f}%", foreground='red' if ram > 80 else 'green')
+                    self.perf_labels[cam]['inf_time'].config(text=f"InfTime: {inf_time:.3f}s", foreground='red' if inf_time > 0.1 else 'green')
+                    self.perf_labels[cam]['gpu'].config(text=f"GPU: {gpu}", foreground='blue')
+                    
+                    global_cpu += cpu
+                    global_ram += ram
+                    count += 1
+                else:
+                    for key in self.perf_labels[cam]:
+                        self.perf_labels[cam][key].config(text=f"{key.upper()}: --", foreground='gray')
+            
+            if count > 0:
+                global_cpu /= count
+                global_ram /= count
+            self.global_labels['cpu'].config(text=f"CPU: {global_cpu:.1f}%", foreground='red' if global_cpu > 80 else 'green')
+            self.global_labels['ram'].config(text=f"RAM: {global_ram:.1f}%", foreground='red' if global_ram > 80 else 'green')
+        except Exception as e:
+            self.log.log("ERROR", f"Erro ao atualizar performance: {e}")
+        
+        self.root.after(1000, self._update_performance)
 
     # ---------------- LOG UI ----------------
     def _log_to_ui(self, line: str):
