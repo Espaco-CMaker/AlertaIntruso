@@ -6,7 +6,7 @@ Arquivo:        AlertaIntruso_V3.9.1.py
 Projeto:        Sistema de Alarme Inteligente por Visão Computacional
 Versão:         3.9.1
 Data:           01/01/2026
-Autor:          Sistema de Monitoramento
+Autor:          Fabio Bettio
 Licença:        Uso educacional / experimental
 
 ================================================================================
