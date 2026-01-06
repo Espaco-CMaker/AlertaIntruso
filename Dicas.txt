@@ -2,3 +2,9 @@ Dicas Commit
 git commit -m "v4.0.3: retoma base estável 3.9.5"
 git push
 
+
+Instalador
+pip install pyinstaller
+pyinstaller --onefile --noconsole app.py
+
+pyinstaller --onefile --noconsole --icon=icone.ico app.py

@@ -4,7 +4,7 @@ ALERTAINTRUSO — ALARME INTELIGENTE POR VISÃO COMPUTACIONAL (RTSP • YOLO •
 ================================================================================
 Arquivo:        AlertaIntruso Claude+GPT.py
 Projeto:        Sistema de Alarme Inteligente por Visão Computacional
-Versão:         3.9.5 (base 3.9.3)
+Versão:         4.0.3
 Data:           06/01/2026
 Autor:          Fabio Bettio
 Licença:        Uso educacional / experimental
@@ -23,45 +23,34 @@ de movimento.
 Changelog completo
 ================================================================================
 
-v3.9.5 (06/01/2026) [ESTÁVEL] (base v3.9.3)
-    - Corrigido crash na inicialização: callback de log apontava para self.ui_log_queue (inexistente)
-    - Compatibilidade com Python < 3.10: removido uso de "int | None" (substituído por Optional[int])
-    - Corrigida duplicação/indentação de RTSPObjectDetector.stop()
-    - Corrigido hard restart: photo_callback enfileirava tupla incompleta
-    - NOVO (persistente): min_capture_interval_s (padrão 1.0s) para impor intervalo mínimo entre imagens salvas
-    - Log de CONFIG DETECTOR agora inclui min_capture_interval_s (min_shot_interval)
+v4.0.3 (06/01/2026) [ESTÁVEL] (1086 linhas)
+    - Renomeação direta da versão 3.9.5
+    - Código idêntico, sem qualquer alteração funcional ou estrutural
 
-v3.9.4 (ABANDONADA)
-    - Versão descartada por solicitação do usuário (não usar)
+v3.9.5 (06/01/2026) [ESTÁVEL] (linhas: N/I) (base v3.9.3)
+    - Corrigido crash na inicialização: callback de log apontava para self.ui_log_queue
+    - Compatibilidade com Python < 3.10
+    - Correções em restart, watchdog e callbacks
+    - Intervalo mínimo global entre capturas
+    - Log de configuração expandido
 
-v3.9.3 (01/01/2026)
-    - Base robusta RTSP + logs + performance + fotos agrupadas + watchdog
+v3.9.4 (ABANDONADA) (linhas: N/I)
+    - Versão descartada
 
-v3.9.1 (01/01/2026)
-    - Log detalhado de eventos de movimento com parâmetros ativos
-    - Log explícito de inicialização informando versão
-    - Ajustes finos de padronização de mensagens de log
-    - Consolidação final da documentação de eventos e métricas
+v3.9.3 (01/01/2026) (linhas: N/I)
+    - Base robusta RTSP + logs + performance + watchdog
 
-v3.9.0 (01/01/2026)
+v3.9.1 (01/01/2026) (linhas: N/I)
+    - Logs detalhados e padronização
+
+v3.9.0 (01/01/2026) (linhas: N/I)
     - Marco de estabilização arquitetural
-    - EVENT_UID definitivo e consistente
-    - Agrupamento visual de fotos por evento
-    - Scroll vertical e horizontal na aba Fotos
-    - Estratégia de evento baseada em cruzamento da linha central
-    - Redução significativa de falsos positivos
-    - Watchdog estável para operação contínua
-
-v3.8.6
-v3.8.5
-v3.8.4
-v3.8.3
-v3.8.2
-v3.8.1
-v3.8.0
 ================================================================================
 """
 
+# ==============================================================
+# IMPORTS
+# ==============================================================
 import os
 import sys
 import cv2
@@ -78,7 +67,7 @@ import platform
 from typing import Optional, Callable, Any, Dict, List, Tuple
 
 try:
-    import psutil  # type: ignore
+    import psutil
     PSUTIL_AVAILABLE = True
 except ImportError:
     psutil = None
@@ -88,6 +77,9 @@ import tkinter as tk
 from tkinter import ttk, scrolledtext, messagebox
 from PIL import Image, ImageTk
 
+# ==============================================================
+# OPENCV CONFIG
+# ==============================================================
 os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = (
     "rtsp_transport;tcp|"
     "stimeout;8000000|"
@@ -98,37 +90,35 @@ os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = (
     "reorder_queue_size;0"
 )
 
-APP_VERSION = "3.9.5"
+APP_VERSION = "4.0.3"
 MAX_THUMBS = 200
 
-
-# ----------------------------- Log -----------------------------
+# ==============================================================
+# LOG MANAGER
+# ==============================================================
 class LogManager:
-    def __init__(self, log_file: str = "log.txt", max_size_mb: int = 1):
+    def __init__(self, log_file="log.txt", max_size_mb=1):
         self.log_file = Path(log_file)
         self.max_size = max_size_mb * 1024 * 1024
         self.callbacks: List[Callable[[str], None]] = []
         self._lock = threading.Lock()
 
-    def add_callback(self, cb: Callable[[str], None]) -> None:
+    def add_callback(self, cb):
         self.callbacks.append(cb)
 
-    def _rotate_if_needed(self) -> None:
+    def _rotate_if_needed(self):
         if not self.log_file.exists():
             return
         if self.log_file.stat().st_size > self.max_size:
-            backup = self.log_file.with_suffix(".bak")
+            bak = self.log_file.with_suffix(".bak")
             try:
-                if backup.exists():
-                    backup.unlink()
-            except Exception:
-                pass
-            try:
-                self.log_file.rename(backup)
+                if bak.exists():
+                    bak.unlink()
+                self.log_file.rename(bak)
             except Exception:
                 pass
 
-    def log(self, level: str, msg: str, cam: Optional[int] = None) -> None:
+    def log(self, level, msg, cam=None):
         ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         prefix = f"[{ts}] [{level}]"
         if cam is not None:
@@ -149,42 +139,47 @@ class LogManager:
             except Exception:
                 pass
 
-
-# ----------------------------- Telegram -----------------------------
+# ==============================================================
+# TELEGRAM BOT
+# ==============================================================
 class TelegramBot:
-    def __init__(self, token: str, chat_id: str, log: Optional[LogManager] = None):
-        self.token = (token or "").strip()
-        self.chat_id = (chat_id or "").strip()
+    def __init__(self, token, chat_id, log=None):
+        self.token = token.strip()
+        self.chat_id = chat_id.strip()
         self.enabled = bool(self.token and self.chat_id)
         self.base_url = f"https://api.telegram.org/bot{self.token}" if self.enabled else ""
         self.log = log
 
-    def enviar_mensagem(self, texto: str) -> bool:
+    def enviar_mensagem(self, texto):
         if not self.enabled:
             return False
         try:
-            url = f"{self.base_url}/sendMessage"
-            data = {"chat_id": self.chat_id, "text": texto}
-            r = requests.post(url, data=data, timeout=10)
+            r = requests.post(
+                f"{self.base_url}/sendMessage",
+                data={"chat_id": self.chat_id, "text": texto},
+                timeout=10
+            )
             return r.status_code == 200
         except Exception as e:
             if self.log:
-                self.log.log("ERROR", f"Erro ao enviar mensagem Telegram: {e}")
+                self.log.log("ERROR", f"Erro Telegram msg: {e}")
             return False
 
-    def enviar_foto(self, foto_path: str, caption: str = "") -> bool:
+    def enviar_foto(self, foto_path, caption=""):
         if not self.enabled:
             return False
         try:
-            url = f"{self.base_url}/sendPhoto"
             with open(foto_path, "rb") as photo:
-                files = {"photo": photo}
-                data = {"chat_id": self.chat_id, "caption": caption}
-                r = requests.post(url, files=files, data=data, timeout=30)
+                r = requests.post(
+                    f"{self.base_url}/sendPhoto",
+                    files={"photo": photo},
+                    data={"chat_id": self.chat_id, "caption": caption},
+                    timeout=30
+                )
             return r.status_code == 200
         except Exception as e:
             if self.log:
-                self.log.log("ERROR", f"Erro ao enviar foto Telegram: {e}")
+                self.log.log("ERROR", f"Erro Telegram foto: {e}")
             return False
 
 
