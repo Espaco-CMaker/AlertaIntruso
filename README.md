@@ -1,6 +1,6 @@
 # AlertaIntruso - Sistema de Alarme Inteligente por Visão Computacional
 
-**Versão Atual no GitHub: 3.9.3** (01/01/2026)
+**Versão Atual Baseada na: 3.9.5** (01/01/2026)
 
 ## Descrição Geral
 
