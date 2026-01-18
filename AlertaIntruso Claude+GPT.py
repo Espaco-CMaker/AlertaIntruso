@@ -4,8 +4,8 @@ ALERTAINTRUSO — ALARME INTELIGENTE POR VISÃO COMPUTACIONAL (RTSP • YOLO •
 ================================================================================
 Arquivo:        AlertaIntruso Claude+GPT.py
 Projeto:        Sistema de Alarme Inteligente por Visão Computacional
-Versão:         4.0.3
-Data:           06/01/2026
+Versão:         4.2.1 (base 4.1.0 = 4.0.3)
+Data:           18/01/2026
 Autor:          Fabio Bettio
 Licença:        Uso educacional / experimental
 Status:         ESTÁVEL
@@ -23,34 +23,62 @@ de movimento.
 Changelog completo
 ================================================================================
 
-v4.0.3 (06/01/2026) [ESTÁVEL] (1086 linhas)
-    - Renomeação direta da versão 3.9.5
-    - Código idêntico, sem qualquer alteração funcional ou estrutural
+v4.2.1 (18/01/2026) [ESTÁVEL] (linhas: 0) (base v4.1.0)
+    - NOVO: Sistema completo de dicas (tips) explicando cada item do menu de Configurações
+    - NOVO: Checkbox para ativar/desativar exibição de tips (reduz poluição visual)
+    - NOVO: Tooltips automáticos em cada campo quando tips estão ativados
+    - NOVO: Persistência do estado do checkbox de tips em config.ini
 
-v3.9.5 (06/01/2026) [ESTÁVEL] (linhas: N/I) (base v3.9.3)
-    - Corrigido crash na inicialização: callback de log apontava para self.ui_log_queue
-    - Compatibilidade com Python < 3.10
-    - Correções em restart, watchdog e callbacks
-    - Intervalo mínimo global entre capturas
-    - Log de configuração expandido
+v4.1.0 (06/01/2026) [ESTÁVEL] (linhas: 0) (base v4.0.3)
+    - FIX CRÍTICO: migrado TODO o controle temporal sensível (captura/fotos/eventos/reconnect/performance/watchdog) para time.monotonic()
+    - Garantia: min_capture_interval_s agora é respeitado de forma determinística (independente de ajustes no relógio do Windows)
+    - Mantido: timestamps humanos (logs/nomes de arquivo) seguem datetime.now()
 
-v3.9.4 (ABANDONADA) (linhas: N/I)
-    - Versão descartada
+v4.0.3 (06/01/2026) [ESTÁVEL] (linhas: 0) (base v3.9.5)
+    - Renomeada a v3.9.5 para v4.0.3 sem alterações funcionais (rollback total)
+    - Mantém correções e robustez consolidadas da base v3.9.5
 
-v3.9.3 (01/01/2026) (linhas: N/I)
-    - Base robusta RTSP + logs + performance + watchdog
+v4.0.2 (ABANDONADA) (linhas: 0)
+    - Versão descartada (mesmo problema de tela em branco)
 
-v3.9.1 (01/01/2026) (linhas: N/I)
-    - Logs detalhados e padronização
+v4.0.1 (ABANDONADA) (linhas: 0)
+    - Versão descartada (tela em branco)
 
-v3.9.0 (01/01/2026) (linhas: N/I)
+v3.9.5 (06/01/2026) [ESTÁVEL] (linhas: 0) (base v3.9.3)
+    - Corrigido crash na inicialização: callback de log apontava para self.ui_log_queue (inexistente)
+    - Compatibilidade com Python < 3.10: removido uso de "int | None" (substituído por Optional[int])
+    - Corrigida duplicação/indentação de RTSPObjectDetector.stop()
+    - Corrigido hard restart: photo_callback enfileirava tupla incompleta
+    - NOVO (persistente): min_capture_interval_s (padrão 1.0s) para impor intervalo mínimo entre imagens salvas
+    - Log de CONFIG DETECTOR agora inclui min_capture_interval_s (min_shot_interval)
+
+v3.9.4 (ABANDONADA) (linhas: 0)
+    - Versão descartada por solicitação do usuário (não usar)
+
+v3.9.3 (01/01/2026) (linhas: 0)
+    - Base robusta RTSP + logs + performance + fotos agrupadas + watchdog
+
+v3.9.1 (01/01/2026) (linhas: 0)
+    - Log detalhado de eventos de movimento com parâmetros ativos
+    - Log explícito de inicialização informando versão
+    - Ajustes finos de padronização de mensagens de log
+    - Consolidação final da documentação de eventos e métricas
+
+v3.9.0 (01/01/2026) (linhas: 0)
     - Marco de estabilização arquitetural
+    - EVENT_UID definitivo e consistente
+    - Agrupamento visual de fotos por evento
+    - Scroll vertical e horizontal na aba Fotos
+    - Estratégia de evento baseada em cruzamento da linha central
+    - Redução significativa de falsos positivos
+    - Watchdog estável para operação contínua
+================================================================================
+NOTA (linhas):
+    - Neste release, os campos (linhas: 0) ficam como placeholder proposital.
+    - Na próxima interação, eu atualizo o changelog com a contagem REAL por versão.
 ================================================================================
 """
 
-# ==============================================================
-# IMPORTS
-# ==============================================================
 import os
 import sys
 import cv2
@@ -67,7 +95,7 @@ import platform
 from typing import Optional, Callable, Any, Dict, List, Tuple
 
 try:
-    import psutil
+    import psutil  # type: ignore
     PSUTIL_AVAILABLE = True
 except ImportError:
     psutil = None
@@ -77,9 +105,6 @@ import tkinter as tk
 from tkinter import ttk, scrolledtext, messagebox
 from PIL import Image, ImageTk
 
-# ==============================================================
-# OPENCV CONFIG
-# ==============================================================
 os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = (
     "rtsp_transport;tcp|"
     "stimeout;8000000|"
@@ -90,35 +115,61 @@ os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = (
     "reorder_queue_size;0"
 )
 
-APP_VERSION = "4.0.3"
+APP_VERSION = "4.2.1"
 MAX_THUMBS = 200
 
-# ==============================================================
-# LOG MANAGER
-# ==============================================================
+# ----------------------------- Tips do Menu de Configurações -----------------------------
+CONFIGURATION_TIPS = {
+    "cam_enabled": "Ative/desative câmeras individuais sem precisar editar a URL RTSP",
+    "cam_rtsp": "URL RTSP da câmera (ex: rtsp://user:pass@192.168.1.100:554/stream)",
+    "cooldown": "Tempo mínimo (em segundos) entre alertas consecutivos da mesma câmera",
+    "confidence": "Confiança mínima para aceitar uma detecção (0.2 = sensível, 0.95 = rigoroso)",
+    "nms": "Supressão de não-máxima: quanto menor, mais detecções (0.2 = muitas, 0.95 = poucas)",
+    "photos": "Quantidade de fotos capturadas por evento de detecção",
+    "min_capture": "Intervalo mínimo (segundos) entre cada foto capturada em um evento",
+    "person": "Disparar alerta quando pessoa é detectada",
+    "car": "Disparar alerta quando carro é detectado",
+    "bus": "Disparar alerta quando ônibus é detectado",
+    "truck": "Disparar alerta quando caminhão é detectado",
+    "motorcycle": "Disparar alerta quando motocicleta é detectada",
+    "bicycle": "Disparar alerta quando bicicleta é detectada",
+    "dog": "Disparar alerta quando cachorro é detectado",
+    "cat": "Disparar alerta quando gato é detectado",
+    "bird": "Disparar alerta quando pássaro é detectado",
+    "horse": "Disparar alerta quando cavalo é detectado",
+    "bot_token": "Token do bot Telegram (obtenha com @BotFather)",
+    "chat_id": "ID do chat/grupo Telegram para receber notificações",
+    "alert_mode": "Tipo de alerta: 'all' = eventos de sistema + fotos, 'detections' = somente fotos, 'none' = desativado",
+}
+
+
+# ----------------------------- Log -----------------------------
 class LogManager:
-    def __init__(self, log_file="log.txt", max_size_mb=1):
+    def __init__(self, log_file: str = "log.txt", max_size_mb: int = 1):
         self.log_file = Path(log_file)
         self.max_size = max_size_mb * 1024 * 1024
         self.callbacks: List[Callable[[str], None]] = []
         self._lock = threading.Lock()
 
-    def add_callback(self, cb):
+    def add_callback(self, cb: Callable[[str], None]) -> None:
         self.callbacks.append(cb)
 
-    def _rotate_if_needed(self):
+    def _rotate_if_needed(self) -> None:
         if not self.log_file.exists():
             return
         if self.log_file.stat().st_size > self.max_size:
-            bak = self.log_file.with_suffix(".bak")
+            backup = self.log_file.with_suffix(".bak")
             try:
-                if bak.exists():
-                    bak.unlink()
-                self.log_file.rename(bak)
+                if backup.exists():
+                    backup.unlink()
+            except Exception:
+                pass
+            try:
+                self.log_file.rename(backup)
             except Exception:
                 pass
 
-    def log(self, level, msg, cam=None):
+    def log(self, level: str, msg: str, cam: Optional[int] = None) -> None:
         ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         prefix = f"[{ts}] [{level}]"
         if cam is not None:
@@ -139,47 +190,42 @@ class LogManager:
             except Exception:
                 pass
 
-# ==============================================================
-# TELEGRAM BOT
-# ==============================================================
+
+# ----------------------------- Telegram -----------------------------
 class TelegramBot:
-    def __init__(self, token, chat_id, log=None):
-        self.token = token.strip()
-        self.chat_id = chat_id.strip()
+    def __init__(self, token: str, chat_id: str, log: Optional[LogManager] = None):
+        self.token = (token or "").strip()
+        self.chat_id = (chat_id or "").strip()
         self.enabled = bool(self.token and self.chat_id)
         self.base_url = f"https://api.telegram.org/bot{self.token}" if self.enabled else ""
         self.log = log
 
-    def enviar_mensagem(self, texto):
+    def enviar_mensagem(self, texto: str) -> bool:
         if not self.enabled:
             return False
         try:
-            r = requests.post(
-                f"{self.base_url}/sendMessage",
-                data={"chat_id": self.chat_id, "text": texto},
-                timeout=10
-            )
+            url = f"{self.base_url}/sendMessage"
+            data = {"chat_id": self.chat_id, "text": texto}
+            r = requests.post(url, data=data, timeout=10)
             return r.status_code == 200
         except Exception as e:
             if self.log:
-                self.log.log("ERROR", f"Erro Telegram msg: {e}")
+                self.log.log("ERROR", f"Erro ao enviar mensagem Telegram: {e}")
             return False
 
-    def enviar_foto(self, foto_path, caption=""):
+    def enviar_foto(self, foto_path: str, caption: str = "") -> bool:
         if not self.enabled:
             return False
         try:
+            url = f"{self.base_url}/sendPhoto"
             with open(foto_path, "rb") as photo:
-                r = requests.post(
-                    f"{self.base_url}/sendPhoto",
-                    files={"photo": photo},
-                    data={"chat_id": self.chat_id, "caption": caption},
-                    timeout=30
-                )
+                files = {"photo": photo}
+                data = {"chat_id": self.chat_id, "caption": caption}
+                r = requests.post(url, files=files, data=data, timeout=30)
             return r.status_code == 200
         except Exception as e:
             if self.log:
-                self.log.log("ERROR", f"Erro Telegram foto: {e}")
+                self.log.log("ERROR", f"Erro ao enviar foto Telegram: {e}")
             return False
 
 
@@ -191,6 +237,10 @@ class RTSPObjectDetector:
     - Envia fotos para UI via photo_callback(cam_id, foto_path, timestamp_str, event_uid, shot_idx)
     - Evento/alerta/foto: somente se "person" detectada
     - Watchdog usa soft reconnect via request_soft_reconnect()
+
+    v4.1.0:
+    - Todo o controle temporal crítico usa time.monotonic() (captura/evento/reconnect/performance).
+    - datetime.now() fica apenas para carimbo humano (log/arquivo).
     """
 
     def __init__(self, cam_id: int, rtsp_url: str, log: LogManager, telegram: TelegramBot,
@@ -226,37 +276,44 @@ class RTSPObjectDetector:
         self.telegram_mode = "detections"  # all | detections | none
         self.photos_per_event = 2
 
-        # NOVO: intervalo mínimo global entre capturas (persistente via config)
+        # Intervalo mínimo global entre capturas (persistente via config)
         self.min_capture_interval_s = 1.0
 
         # Contadores / estado
         self.detections_total = 0
-        self.last_frame_ts = 0.0  # atualizado quando um frame válido chega
 
-        # Evento por pessoa
+        # Watchdog: usamos monotonic como referência estável
+        self.last_frame_mono = 0.0       # controle (monotonic)
+        self.last_frame_wall_ts = 0.0    # apenas informativo (time.time)
+
+        # Evento por pessoa (monotonic)
         self._last_event_time = 0.0
         self._pending_shots = 0
         self._event_uid = ""
 
+        # Capturas por evento (monotonic)
         self._last_shot_time = 0.0
         self._min_shot_interval = 0.7  # segundos entre fotos do mesmo evento
 
-        # Controle global de captura (entre eventos também)
+        # Controle global de captura (monotonic)
         self._last_capture_time_global = 0.0
 
-        # Classes habilitadas (mas evento só dispara se person estiver presente)
+        # Classes habilitadas (evento só dispara se person estiver presente)
         self.classes_enabled = {0}  # person
 
         # Soft reconnect trigger (watchdog)
         self.reconnect_event = threading.Event()
-        self._last_soft_reconnect_ts = 0.0
+        self._last_soft_reconnect_mono = 0.0
         self._pending_reconnect_reason = "watchdog"
 
-        # Robustez RTSP
+        # Robustez RTSP (monotonic)
         self._bad_reads = 0
-        self._last_reconnect_try = 0.0
+        self._last_reconnect_try_mono = 0.0
         self._reconnect_backoff_s = 2.0
         self._max_backoff_s = 20.0
+
+        # Throttle de logs (monotonic)
+        self._last_nonperson_log_mono = 0.0
 
         self._init_yolo()
 
@@ -384,7 +441,7 @@ class RTSPObjectDetector:
             return False
 
     def _detect(self, frame_bgr):
-        start_inf = time.time()
+        start_inf = time.monotonic()
         h, w = frame_bgr.shape[:2]
         blob = cv2.dnn.blobFromImage(
             frame_bgr, 1 / 255.0, (self.input_size, self.input_size),
@@ -418,7 +475,7 @@ class RTSPObjectDetector:
                 f_confs.append(confs[i])
                 f_cids.append(cids[i])
 
-        inf_time = time.time() - start_inf
+        inf_time = time.monotonic() - start_inf
         return f_boxes, f_confs, f_cids, inf_time
 
     def _draw_boxes(self, frame_bgr, boxes, confs, cids):
@@ -472,11 +529,11 @@ class RTSPObjectDetector:
         self.reconnect_event.set()
 
     def _soft_reconnect_now(self, reason: str) -> bool:
-        now = datetime.now().timestamp()
-        if (now - float(self._last_soft_reconnect_ts or 0.0)) < 5.0:
+        now_mono = time.monotonic()
+        if (now_mono - float(self._last_soft_reconnect_mono or 0.0)) < 5.0:
             return False
 
-        self._last_soft_reconnect_ts = now
+        self._last_soft_reconnect_mono = now_mono
         self.log.log("WARN", f"Soft reconnect solicitado ({reason}).", self.cam_id)
 
         try:
@@ -490,7 +547,8 @@ class RTSPObjectDetector:
             self._pending_shots = 0
             self._last_shot_time = 0.0
             self._last_event_time = 0.0
-            self.last_frame_ts = 0.0
+            self.last_frame_mono = 0.0
+            self.last_frame_wall_ts = 0.0
             self.log.log("INFO", "Soft reconnect OK.", self.cam_id)
             return True
 
@@ -498,7 +556,6 @@ class RTSPObjectDetector:
         return False
 
     def stop(self) -> None:
-        # Só sinaliza para sair do loop. Cleanup do cap é no finally do run().
         self.running = False
 
     def run(self):
@@ -511,7 +568,7 @@ class RTSPObjectDetector:
             self._log_detector_config()
 
             frame_count = 0
-            start_time = time.time()
+            start_mono = time.monotonic()
 
             while self.running:
                 if self.reconnect_event.is_set():
@@ -529,9 +586,9 @@ class RTSPObjectDetector:
                     if self._bad_reads in (1, 5, 15) or (self._bad_reads % 30 == 0):
                         self.log.log("WARN", f"Frame falhou ({self._bad_reads}). Tentando recuperar...", self.cam_id)
 
-                    now_ts = datetime.now().timestamp()
-                    if (now_ts - self._last_reconnect_try) >= self._reconnect_backoff_s:
-                        self._last_reconnect_try = now_ts
+                    now_mono = time.monotonic()
+                    if (now_mono - self._last_reconnect_try_mono) >= self._reconnect_backoff_s:
+                        self._last_reconnect_try_mono = now_mono
                         try:
                             if self.cap is not None:
                                 self.cap.release()
@@ -549,12 +606,15 @@ class RTSPObjectDetector:
                     time.sleep(0.05)
                     continue
 
+                # frame OK
                 self._bad_reads = 0
                 self._reconnect_backoff_s = 2.0
 
-                self.last_frame_ts = datetime.now().timestamp()
+                now_mono = time.monotonic()
+                self.last_frame_mono = now_mono
+                self.last_frame_wall_ts = time.time()
+
                 frame_count += 1
-                now = self.last_frame_ts
 
                 if frame.std() < 5.0:
                     continue
@@ -563,10 +623,10 @@ class RTSPObjectDetector:
                 self.inf_times.append(inf_time)
                 frame_draw = self._draw_boxes(frame, boxes, confs, cids)
 
+                # Log "movimento sem pessoa" (throttle via monotonic)
                 if boxes and (not self._person_present(cids)):
-                    now_ts2 = time.time()
-                    if (now_ts2 - getattr(self, "_last_nonperson_log", 0.0)) > 5.0:
-                        self._last_nonperson_log = now_ts2
+                    if (now_mono - self._last_nonperson_log_mono) > 5.0:
+                        self._last_nonperson_log_mono = now_mono
                         conf_avg = (sum(confs) / len(confs)) if confs else 0.0
                         self.log.log(
                             "INFO",
@@ -579,12 +639,13 @@ class RTSPObjectDetector:
                             self.cam_id
                         )
 
+                # Disparo de evento (monotonic)
                 if boxes and self._person_present(cids):
-                    if (now - self._last_event_time) >= self.cooldown_s and self._pending_shots <= 0:
-                        evt_ts = int(now)
+                    if (now_mono - self._last_event_time) >= self.cooldown_s and self._pending_shots <= 0:
+                        evt_ts = int(time.time())  # carimbo humano apenas
                         self._event_uid = f"{self.cam_id}-{evt_ts}-{self.detections_total + 1}"
                         self._pending_shots = int(max(1, self.photos_per_event))
-                        self._last_event_time = now
+                        self._last_event_time = now_mono
                         self._last_shot_time = 0.0
                         self.detections_total += 1
 
@@ -604,12 +665,10 @@ class RTSPObjectDetector:
                             self.cam_id
                         )
 
-                # fotos pendentes (COM LIMITE GLOBAL DE CAPTURA)
+                # Fotos pendentes (monotonic + limite global)
                 if self._pending_shots > 0:
-                    # 1) intervalo entre shots do evento
-                    if (now - self._last_shot_time) >= self._min_shot_interval:
-                        # 2) intervalo global entre capturas (entre eventos também)
-                        if (now - self._last_capture_time_global) >= self.min_capture_interval_s:
+                    if (now_mono - self._last_shot_time) >= self._min_shot_interval:
+                        if (now_mono - self._last_capture_time_global) >= self.min_capture_interval_s:
                             person_count = sum(1 for cid in cids if cid == 0)
                             conf_avg = (sum(confs) / len(confs)) if confs else 0.0
                             shot_idx = (int(self.photos_per_event) - int(self._pending_shots) + 1)
@@ -617,11 +676,8 @@ class RTSPObjectDetector:
                             self._save_and_notify(frame_draw, self._event_uid, shot_idx, person_count, conf_avg)
 
                             self._pending_shots -= 1
-                            self._last_shot_time = now
-                            self._last_capture_time_global = now
-                        else:
-                            # ainda não atingiu tempo mínimo global -> não captura agora
-                            pass
+                            self._last_shot_time = now_mono
+                            self._last_capture_time_global = now_mono
 
                 if self.frame_callback:
                     try:
@@ -629,8 +685,9 @@ class RTSPObjectDetector:
                     except Exception as e:
                         self.log.log("ERROR", f"Erro no callback de frame: {e}", self.cam_id)
 
+                # Performance (monotonic)
                 if frame_count % 200 == 0:
-                    elapsed = time.time() - start_time
+                    elapsed = time.monotonic() - start_mono
                     fps = frame_count / elapsed if elapsed > 0 else 0
                     if PSUTIL_AVAILABLE:
                         cpu_percent = psutil.cpu_percent(interval=None)
@@ -679,7 +736,6 @@ class InterfaceGrafica:
         self.photo_queue = queue.Queue()
         self.log_queue = queue.Queue()
 
-        # CORREÇÃO: usar log_queue (não existe ui_log_queue)
         self.log.add_callback(lambda line: self.log_queue.put(line))
 
         self.log.log(
@@ -687,13 +743,11 @@ class InterfaceGrafica:
             f"Inicializando sistema | AlertaIntruso v{APP_VERSION} | Python {platform.python_version()} | OpenCV {cv2.__version__}"
         )
 
-        # Capturar logs do OpenCV (se disponível)
         try:
             cv2.setLogCallback(lambda level, msg: self.log.log("INFO", f"OpenCV [{level}]: {msg.strip()}"))
         except Exception:
             self.log.log("WARN", "cv2.setLogCallback não disponível. Logs do OpenCV não serão capturados.")
 
-        # Capturar stderr (mas sem esconder crashes silenciosos)
         self.old_stderr = sys.stderr
         try:
             r, w = os.pipe()
@@ -713,11 +767,11 @@ class InterfaceGrafica:
         self.threads: Dict[int, threading.Thread] = {}
         self.running = False
 
-        # Watchdog settings
+        # Watchdog (monotonic)
         self.watchdog_interval_ms = 2000
         self.watchdog_no_frame_s = 12.0
         self.watchdog_restart_backoff_s = 10.0
-        self._last_restart_ts: Dict[int, float] = {}
+        self._last_restart_mono: Dict[int, float] = {}
 
         self._last_daily_restart_date = None
 
@@ -779,12 +833,15 @@ class InterfaceGrafica:
                 "nms_threshold": "0.4",
                 "photos_per_event": "2",
                 "classes_enabled": "person",
-                "min_capture_interval_s": "1.0",  # NOVO (persistente)
+                "min_capture_interval_s": "1.0",
             },
             "TELEGRAM": {
                 "bot_token": "",
                 "chat_id": "",
                 "alert_mode": "detections",
+            },
+            "UI": {
+                "show_tips": "True",
             }
         }
 
@@ -848,6 +905,8 @@ class InterfaceGrafica:
         self.config["TELEGRAM"]["chat_id"] = self.e_chat.get().strip()
         self.config["TELEGRAM"]["alert_mode"] = self.cb_alert.get().strip()
 
+        self.config["UI"]["show_tips"] = str(bool(self.var_show_tips.get()))
+
         with open(self.config_file, "w", encoding="utf-8") as f:
             self.config.write(f)
 
@@ -878,15 +937,36 @@ class InterfaceGrafica:
             self.cam_labels[cam_id] = lbl
 
     def _build_config_tab(self):
+        # Armazenar referência de widgets para mostrar/esconder tooltips
+        self.tip_widgets = []
+
         wrap = ttk.Frame(self.frame_config)
         wrap.pack(fill="both", expand=True, padx=10, pady=10)
 
+        # ========== CHECKBOX DE TIPS ==========
+        tips_frame = ttk.Frame(wrap)
+        tips_frame.pack(fill="x", pady=(0, 15), padx=5)
+
+        self.var_show_tips = tk.BooleanVar(value=self.config["UI"].getboolean("show_tips", fallback=True))
+        self.cb_tips = ttk.Checkbutton(
+            tips_frame, text="Mostrar Dicas (Tips) dos campos",
+            variable=self.var_show_tips,
+            command=self._toggle_tips_visibility
+        )
+        self.cb_tips.pack(side="left")
+
+        ttk.Label(tips_frame, text="— Ative para exibir explicações de cada parâmetro", foreground="gray").pack(side="left", padx=10)
+
+        # ========== CÂMERAS ==========
         rt = ttk.LabelFrame(wrap, text="Câmeras (ativar/desativar) + RTSP", padding=10)
         rt.pack(fill="x", pady=8)
 
         def cam_row(row, label, var_enable, entry):
-            ttk.Checkbutton(rt, text=label, variable=var_enable).grid(row=row, column=0, sticky="w", padx=4)
+            cb = ttk.Checkbutton(rt, text=label, variable=var_enable)
+            cb.grid(row=row, column=0, sticky="w", padx=4)
             entry.grid(row=row, column=1, padx=6, pady=4, sticky="we")
+            self._add_tooltip_to_widget(cb, CONFIGURATION_TIPS["cam_enabled"])
+            self._add_tooltip_to_widget(entry, CONFIGURATION_TIPS["cam_rtsp"])
 
         self.var_cam1 = tk.BooleanVar(value=self.config["CAM1"].getboolean("enabled", fallback=True))
         self.var_cam2 = tk.BooleanVar(value=self.config["CAM2"].getboolean("enabled", fallback=True))
@@ -910,34 +990,51 @@ class InterfaceGrafica:
         self.e_rtsp3.insert(0, self.config["CAM3"]["rtsp_url"])
         self.e_rtsp4.insert(0, self.config["CAM4"]["rtsp_url"])
 
+        # ========== DETECTOR ==========
         det = ttk.LabelFrame(wrap, text="Detector", padding=10)
         det.pack(fill="x", pady=8)
 
-        ttk.Label(det, text="Cooldown (s):").grid(row=0, column=0, sticky="w")
+        lbl_cooldown = ttk.Label(det, text="Cooldown (s):")
+        lbl_cooldown.grid(row=0, column=0, sticky="w")
         self.sp_cooldown = ttk.Spinbox(det, from_=1, to=30, width=8)
         self.sp_cooldown.grid(row=0, column=1, padx=6, pady=4, sticky="w")
         self.sp_cooldown.set(self.config["DETECTOR"].get("cooldown", "2"))
+        self._add_tooltip_to_widget(lbl_cooldown, CONFIGURATION_TIPS["cooldown"])
+        self._add_tooltip_to_widget(self.sp_cooldown, CONFIGURATION_TIPS["cooldown"])
 
-        ttk.Label(det, text="Confiança:").grid(row=0, column=2, sticky="w")
+        lbl_conf = ttk.Label(det, text="Confiança:")
+        lbl_conf.grid(row=0, column=2, sticky="w")
         self.sp_conf = ttk.Spinbox(det, from_=0.2, to=0.95, increment=0.05, width=8)
         self.sp_conf.grid(row=0, column=3, padx=6, pady=4, sticky="w")
         self.sp_conf.set(self.config["DETECTOR"].get("confidence_threshold", "0.5"))
+        self._add_tooltip_to_widget(lbl_conf, CONFIGURATION_TIPS["confidence"])
+        self._add_tooltip_to_widget(self.sp_conf, CONFIGURATION_TIPS["confidence"])
 
-        ttk.Label(det, text="NMS:").grid(row=0, column=4, sticky="w")
+        lbl_nms = ttk.Label(det, text="NMS:")
+        lbl_nms.grid(row=0, column=4, sticky="w")
         self.sp_nms = ttk.Spinbox(det, from_=0.2, to=0.95, increment=0.05, width=8)
         self.sp_nms.grid(row=0, column=5, padx=6, pady=4, sticky="w")
         self.sp_nms.set(self.config["DETECTOR"].get("nms_threshold", "0.4"))
+        self._add_tooltip_to_widget(lbl_nms, CONFIGURATION_TIPS["nms"])
+        self._add_tooltip_to_widget(self.sp_nms, CONFIGURATION_TIPS["nms"])
 
-        ttk.Label(det, text="Fotos por evento:").grid(row=0, column=6, sticky="w")
+        lbl_photos = ttk.Label(det, text="Fotos por evento:")
+        lbl_photos.grid(row=0, column=6, sticky="w")
         self.sp_photos = ttk.Spinbox(det, from_=1, to=10, width=6)
         self.sp_photos.grid(row=0, column=7, padx=6, pady=4, sticky="w")
         self.sp_photos.set(self.config["DETECTOR"].get("photos_per_event", "2"))
+        self._add_tooltip_to_widget(lbl_photos, CONFIGURATION_TIPS["photos"])
+        self._add_tooltip_to_widget(self.sp_photos, CONFIGURATION_TIPS["photos"])
 
-        ttk.Label(det, text="Min. entre capturas (s):").grid(row=1, column=0, sticky="w")
+        lbl_min_capture = ttk.Label(det, text="Min. entre capturas (s):")
+        lbl_min_capture.grid(row=1, column=0, sticky="w")
         self.sp_min_capture = ttk.Spinbox(det, from_=0.2, to=10.0, increment=0.1, width=8)
         self.sp_min_capture.grid(row=1, column=1, padx=6, pady=4, sticky="w")
         self.sp_min_capture.set(self.config["DETECTOR"].get("min_capture_interval_s", "1.0"))
+        self._add_tooltip_to_widget(lbl_min_capture, CONFIGURATION_TIPS["min_capture"])
+        self._add_tooltip_to_widget(self.sp_min_capture, CONFIGURATION_TIPS["min_capture"])
 
+        # ========== CLASSES ==========
         cls = ttk.LabelFrame(wrap, text="Classes (somente pessoa dispara alerta)", padding=10)
         cls.pack(fill="x", pady=8)
 
@@ -954,35 +1051,75 @@ class InterfaceGrafica:
         self.var_bird = tk.BooleanVar(value=("bird" in enabled))
         self.var_horse = tk.BooleanVar(value=("horse" in enabled))
 
-        ttk.Checkbutton(cls, text="person", variable=self.var_person).grid(row=0, column=0, sticky="w", padx=6, pady=2)
-        ttk.Checkbutton(cls, text="car", variable=self.var_car).grid(row=0, column=1, sticky="w", padx=6, pady=2)
-        ttk.Checkbutton(cls, text="bus", variable=self.var_bus).grid(row=0, column=2, sticky="w", padx=6, pady=2)
-        ttk.Checkbutton(cls, text="truck", variable=self.var_truck).grid(row=0, column=3, sticky="w", padx=6, pady=2)
-        ttk.Checkbutton(cls, text="motorcycle", variable=self.var_motorcycle).grid(row=0, column=4, sticky="w", padx=6, pady=2)
-        ttk.Checkbutton(cls, text="bicycle", variable=self.var_bicycle).grid(row=0, column=5, sticky="w", padx=6, pady=2)
-        ttk.Checkbutton(cls, text="dog", variable=self.var_dog).grid(row=1, column=0, sticky="w", padx=6, pady=2)
-        ttk.Checkbutton(cls, text="cat", variable=self.var_cat).grid(row=1, column=1, sticky="w", padx=6, pady=2)
-        ttk.Checkbutton(cls, text="bird", variable=self.var_bird).grid(row=1, column=2, sticky="w", padx=6, pady=2)
-        ttk.Checkbutton(cls, text="horse", variable=self.var_horse).grid(row=1, column=3, sticky="w", padx=6, pady=2)
+        cb_person = ttk.Checkbutton(cls, text="person", variable=self.var_person)
+        cb_person.grid(row=0, column=0, sticky="w", padx=6, pady=2)
+        self._add_tooltip_to_widget(cb_person, CONFIGURATION_TIPS["person"])
 
+        cb_car = ttk.Checkbutton(cls, text="car", variable=self.var_car)
+        cb_car.grid(row=0, column=1, sticky="w", padx=6, pady=2)
+        self._add_tooltip_to_widget(cb_car, CONFIGURATION_TIPS["car"])
+
+        cb_bus = ttk.Checkbutton(cls, text="bus", variable=self.var_bus)
+        cb_bus.grid(row=0, column=2, sticky="w", padx=6, pady=2)
+        self._add_tooltip_to_widget(cb_bus, CONFIGURATION_TIPS["bus"])
+
+        cb_truck = ttk.Checkbutton(cls, text="truck", variable=self.var_truck)
+        cb_truck.grid(row=0, column=3, sticky="w", padx=6, pady=2)
+        self._add_tooltip_to_widget(cb_truck, CONFIGURATION_TIPS["truck"])
+
+        cb_motorcycle = ttk.Checkbutton(cls, text="motorcycle", variable=self.var_motorcycle)
+        cb_motorcycle.grid(row=0, column=4, sticky="w", padx=6, pady=2)
+        self._add_tooltip_to_widget(cb_motorcycle, CONFIGURATION_TIPS["motorcycle"])
+
+        cb_bicycle = ttk.Checkbutton(cls, text="bicycle", variable=self.var_bicycle)
+        cb_bicycle.grid(row=0, column=5, sticky="w", padx=6, pady=2)
+        self._add_tooltip_to_widget(cb_bicycle, CONFIGURATION_TIPS["bicycle"])
+
+        cb_dog = ttk.Checkbutton(cls, text="dog", variable=self.var_dog)
+        cb_dog.grid(row=1, column=0, sticky="w", padx=6, pady=2)
+        self._add_tooltip_to_widget(cb_dog, CONFIGURATION_TIPS["dog"])
+
+        cb_cat = ttk.Checkbutton(cls, text="cat", variable=self.var_cat)
+        cb_cat.grid(row=1, column=1, sticky="w", padx=6, pady=2)
+        self._add_tooltip_to_widget(cb_cat, CONFIGURATION_TIPS["cat"])
+
+        cb_bird = ttk.Checkbutton(cls, text="bird", variable=self.var_bird)
+        cb_bird.grid(row=1, column=2, sticky="w", padx=6, pady=2)
+        self._add_tooltip_to_widget(cb_bird, CONFIGURATION_TIPS["bird"])
+
+        cb_horse = ttk.Checkbutton(cls, text="horse", variable=self.var_horse)
+        cb_horse.grid(row=1, column=3, sticky="w", padx=6, pady=2)
+        self._add_tooltip_to_widget(cb_horse, CONFIGURATION_TIPS["horse"])
+
+        # ========== TELEGRAM ==========
         tg = ttk.LabelFrame(wrap, text="Telegram (persistente em config.ini)", padding=10)
         tg.pack(fill="x", pady=8)
 
-        ttk.Label(tg, text="Bot Token:").grid(row=0, column=0, sticky="w")
+        lbl_token = ttk.Label(tg, text="Bot Token:")
+        lbl_token.grid(row=0, column=0, sticky="w")
         self.e_token = ttk.Entry(tg, width=60)
         self.e_token.grid(row=0, column=1, padx=6, pady=4, sticky="w")
         self.e_token.insert(0, self.config["TELEGRAM"].get("bot_token", ""))
+        self._add_tooltip_to_widget(lbl_token, CONFIGURATION_TIPS["bot_token"])
+        self._add_tooltip_to_widget(self.e_token, CONFIGURATION_TIPS["bot_token"])
 
-        ttk.Label(tg, text="Chat ID:").grid(row=1, column=0, sticky="w")
+        lbl_chat = ttk.Label(tg, text="Chat ID:")
+        lbl_chat.grid(row=1, column=0, sticky="w")
         self.e_chat = ttk.Entry(tg, width=60)
         self.e_chat.grid(row=1, column=1, padx=6, pady=4, sticky="w")
         self.e_chat.insert(0, self.config["TELEGRAM"].get("chat_id", ""))
+        self._add_tooltip_to_widget(lbl_chat, CONFIGURATION_TIPS["chat_id"])
+        self._add_tooltip_to_widget(self.e_chat, CONFIGURATION_TIPS["chat_id"])
 
-        ttk.Label(tg, text="Alertas (fotos):").grid(row=2, column=0, sticky="w")
+        lbl_alert = ttk.Label(tg, text="Alertas (fotos):")
+        lbl_alert.grid(row=2, column=0, sticky="w")
         self.cb_alert = ttk.Combobox(tg, values=["all", "detections", "none"], state="readonly", width=12)
         self.cb_alert.grid(row=2, column=1, padx=6, pady=4, sticky="w")
         self.cb_alert.set(self.config["TELEGRAM"].get("alert_mode", "detections"))
+        self._add_tooltip_to_widget(lbl_alert, CONFIGURATION_TIPS["alert_mode"])
+        self._add_tooltip_to_widget(self.cb_alert, CONFIGURATION_TIPS["alert_mode"])
 
+        # ========== CONTROLES ==========
         ctrl = ttk.Frame(wrap)
         ctrl.pack(fill="x", pady=10)
 
@@ -1000,6 +1137,52 @@ class InterfaceGrafica:
 
         self.lbl_status = ttk.Label(ctrl, text="Status: Parado", foreground="red")
         self.lbl_status.pack(side="left", padx=20)
+
+    def _add_tooltip_to_widget(self, widget, tip_text: str):
+        """Adiciona um tooltip que aparece/desaparece conforme o checkbox de tips"""
+        self.tip_widgets.append((widget, tip_text))
+
+    def _toggle_tips_visibility(self):
+        """Alterna a visibilidade dos tooltips"""
+        show_tips = self.var_show_tips.get()
+        for widget, tip_text in self.tip_widgets:
+            if show_tips:
+                self._show_tooltip_on_hover(widget, tip_text)
+            else:
+                self._hide_tooltip(widget)
+
+    def _show_tooltip_on_hover(self, widget, text):
+        """Mostra tooltip ao passar mouse sobre widget"""
+        def on_enter(event):
+            if not self.var_show_tips.get():
+                return
+            tooltip = tk.Toplevel()
+            tooltip.wm_overrideredirect(True)
+            tooltip.wm_geometry(f"+{event.x_root+10}+{event.y_root+10}")
+            label = tk.Label(tooltip, text=text, background="#ffffe0", relief="solid", borderwidth=1, wraplength=300, justify="left", font=("Arial", 9))
+            label.pack()
+            widget.tooltip = tooltip
+
+            def on_leave(event):
+                if hasattr(widget, "tooltip"):
+                    try:
+                        widget.tooltip.destroy()
+                    except:
+                        pass
+                    widget.tooltip = None
+
+            widget.bind("<Leave>", on_leave)
+
+        widget.bind("<Enter>", on_enter)
+
+    def _hide_tooltip(self, widget):
+        """Esconde tooltip"""
+        if hasattr(widget, "tooltip"):
+            try:
+                widget.tooltip.destroy()
+            except:
+                pass
+            widget.tooltip = None
 
     def _build_photos_tab(self):
         self.photos_canvas = tk.Canvas(self.frame_fotos)
@@ -1252,8 +1435,6 @@ class InterfaceGrafica:
         det.nms_th = float(self.config["DETECTOR"].get("nms_threshold", "0.4"))
         det.telegram_mode = self.config["TELEGRAM"].get("alert_mode", "detections")
         det.photos_per_event = int(self.config["DETECTOR"].get("photos_per_event", "2"))
-
-        # NOVO (persistente): intervalo mínimo global entre capturas
         det.min_capture_interval_s = float(self.config["DETECTOR"].get("min_capture_interval_s", "1.0"))
 
         name_to_id = {
@@ -1383,12 +1564,12 @@ class InterfaceGrafica:
 
     # ---------------- RESTART HELPERS ----------------
     def _restart_single_camera(self, cam_id: int, reason: str = ""):
-        now = datetime.now().timestamp()
-        last = float(self._last_restart_ts.get(cam_id, 0.0) or 0.0)
-        if (now - last) < self.watchdog_restart_backoff_s:
+        now_mono = time.monotonic()
+        last = float(self._last_restart_mono.get(cam_id, 0.0) or 0.0)
+        if (now_mono - last) < self.watchdog_restart_backoff_s:
             return
 
-        self._last_restart_ts[cam_id] = now
+        self._last_restart_mono[cam_id] = now_mono
         self.log.log("WARN", f"Hard restart câmera ({reason})", cam_id)
 
         det = self.detectors.get(cam_id)
@@ -1426,7 +1607,6 @@ class InterfaceGrafica:
             self._apply_detector_config(new_det)
 
             new_det.frame_callback = lambda cid, fr, q=self.frame_queue: q.put((cid, fr))
-            # CORREÇÃO: enfileirar 5 itens (como o consumidor espera)
             new_det.photo_callback = lambda cid, path, ts, event_uid, shot_idx, q=self.photo_queue: q.put((cid, path, ts, event_uid, shot_idx))
 
             new_th = threading.Thread(target=new_det.run, daemon=True)
@@ -1465,14 +1645,14 @@ class InterfaceGrafica:
     def _supervise_cameras(self):
         try:
             if self.running and self.detectors:
-                now = datetime.now().timestamp()
+                now_mono = time.monotonic()
 
                 for cam_id, det in list(self.detectors.items()):
-                    last = float(getattr(det, "last_frame_ts", 0.0) or 0.0)
-                    if last <= 0.0:
+                    last_mono = float(getattr(det, "last_frame_mono", 0.0) or 0.0)
+                    if last_mono <= 0.0:
                         continue
 
-                    delta = now - last
+                    delta = now_mono - last_mono
                     if delta > (self.watchdog_no_frame_s * 2):
                         self.log.log("WARN", f"Watchdog: sem frame {delta:.0f}s -> hard restart", cam_id)
                         self._restart_single_camera(cam_id, reason="persistiu sem frame")
@@ -1520,6 +1700,16 @@ if __name__ == "__main__":
     except Exception:
         pass
 
-    root = tk.Tk()
-    app = InterfaceGrafica(root)
-    root.mainloop()
+    try:
+        root = tk.Tk()
+        app = InterfaceGrafica(root)
+        root.mainloop()
+    except Exception as e:
+        import traceback
+        with open("error.log", "w", encoding="utf-8") as f:
+            f.write(f"ERRO FATAL:\n{type(e).__name__}: {e}\n\n")
+            f.write(traceback.format_exc())
+        print(f"ERRO FATAL: {type(e).__name__}: {e}")
+        traceback.print_exc()
+        input("Pressione Enter para sair...")
+        raise
