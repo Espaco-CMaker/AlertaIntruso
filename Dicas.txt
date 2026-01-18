@@ -2,9 +2,23 @@ Dicas Commit
 git commit -m "v4.0.3: retoma base estável 3.9.5"
 git push
 
+================================================
+Mudar Local do Repositório
+git remote set-url origin https://github.com/Espaco-CMaker/ConverteTxt_MP3.git
 
+git remote -v
+
+================================================
 Instalador
 pip install pyinstaller
 pyinstaller --onefile --noconsole app.py
 
 pyinstaller --onefile --noconsole --icon=icone.ico app.py
+
+================================================
+Criar Reporitorio Guigit init
+gh repo create Alerta_Intruso --public --source=. --remote=origin --push
+
+git init
+gh repo create Espaco-CMaker/NOME_DO_REPOSITORIO --public --source=. --remote=origin --push
+
