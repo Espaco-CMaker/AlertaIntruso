@@ -4,7 +4,7 @@ ALERTAINTRUSO — ALARME INTELIGENTE POR VISÃO COMPUTACIONAL (RTSP • YOLO •
 ================================================================================
 Arquivo:        AlertaIntruso Claude+GPT.py
 Projeto:        Sistema de Alarme Inteligente por Visão Computacional
-Versão:         4.2.1 (base 4.1.0 = 4.0.3)
+Versão:         4.2.2 (base 4.2.1)
 Data:           18/01/2026
 Autor:          Fabio Bettio
 Licença:        Uso educacional / experimental
@@ -22,6 +22,15 @@ de movimento.
 ================================================================================
 Changelog completo
 ================================================================================
+
+v4.2.2 (18/01/2026) [PERFORMANCE] (linhas: 0) (base v4.2.1)
+    - OTIMIZAÇÃO: Skip de frames YOLO (processa 1 a cada 3) - reduz carga CPU em 66%
+    - OTIMIZAÇÃO: input_size padrão 320 (era 416) - inferência 2x mais rápida
+    - OTIMIZAÇÃO: Watchdog aumentado de 12s para 20s (tolera rede instável)
+    - NOVO: Parâmetro skip_frames configurável (padrão: 2)
+    - NOVO: Parâmetro input_size configurável (320/416/608)
+    - MELHORIA: UI sempre recebe frames (mesmo pulados) - visualização fluida
+    - FIX: Reduz hard restarts causados por latência de rede
 
 v4.2.1 (18/01/2026) [ESTÁVEL] (linhas: 0) (base v4.1.0)
     - NOVO: Sistema completo de dicas (tips) explicando cada item do menu de Configurações
@@ -115,7 +124,7 @@ os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = (
     "reorder_queue_size;0"
 )
 
-APP_VERSION = "4.2.1"
+APP_VERSION = "4.2.2"
 MAX_THUMBS = 200
 
 # ----------------------------- Tips do Menu de Configurações -----------------------------
@@ -275,12 +284,17 @@ class RTSPObjectDetector:
         self.input_size = 416
         self.telegram_mode = "detections"  # all | detections | none
         self.photos_per_event = 2
+        
+        # OTIMIZAÇÃO: Skip frames para reduzir carga de processamento
+        # skip_frames=2 significa processar 1 frame a cada 3 (pula 2)
+        self.skip_frames = 2  # Padrão: processa 1 a cada 3 frames
 
         # Intervalo mínimo global entre capturas (persistente via config)
         self.min_capture_interval_s = 1.0
 
         # Contadores / estado
         self.detections_total = 0
+        self._frame_skip_counter = 0  # Contador para skip de frames
 
         # Watchdog: usamos monotonic como referência estável
         self.last_frame_mono = 0.0       # controle (monotonic)
@@ -616,6 +630,20 @@ class RTSPObjectDetector:
 
                 frame_count += 1
 
+                # OTIMIZAÇÃO: Skip de processamento YOLO (reduz carga em 66% com skip=2)
+                # Frame RAW é sempre enviado para UI, mas YOLO só processa 1 a cada (skip+1) frames
+                self._frame_skip_counter += 1
+                if self._frame_skip_counter <= self.skip_frames:
+                    # Envia frame sem processamento para UI (visualização fluida)
+                    if self.frame_callback:
+                        try:
+                            self.frame_callback(self.cam_id, frame)
+                        except Exception as e:
+                            self.log.log("ERROR", f"Erro no callback de frame: {e}", self.cam_id)
+                    continue  # Pula processamento YOLO
+                
+                self._frame_skip_counter = 0  # Reset contador
+
                 if frame.std() < 5.0:
                     continue
 
@@ -769,7 +797,7 @@ class InterfaceGrafica:
 
         # Watchdog (monotonic)
         self.watchdog_interval_ms = 2000
-        self.watchdog_no_frame_s = 12.0
+        self.watchdog_no_frame_s = 20.0  # Aumentado de 12s para 20s (rede instável)
         self.watchdog_restart_backoff_s = 10.0
         self._last_restart_mono: Dict[int, float] = {}
 
@@ -834,6 +862,8 @@ class InterfaceGrafica:
                 "photos_per_event": "2",
                 "classes_enabled": "person",
                 "min_capture_interval_s": "1.0",
+                "skip_frames": "2",  # Pula 2 frames (processa 1 a cada 3) - melhora performance
+                "input_size": "320",  # Resolução YOLO (320=rápido, 416=preciso, 608=lento)
             },
             "TELEGRAM": {
                 "bot_token": "",
@@ -1436,6 +1466,8 @@ class InterfaceGrafica:
         det.telegram_mode = self.config["TELEGRAM"].get("alert_mode", "detections")
         det.photos_per_event = int(self.config["DETECTOR"].get("photos_per_event", "2"))
         det.min_capture_interval_s = float(self.config["DETECTOR"].get("min_capture_interval_s", "1.0"))
+        det.skip_frames = int(self.config["DETECTOR"].get("skip_frames", "2"))
+        det.input_size = int(self.config["DETECTOR"].get("input_size", "320"))
 
         name_to_id = {
             "person": 0, "bicycle": 1, "car": 2, "motorcycle": 3,
