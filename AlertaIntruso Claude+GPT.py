@@ -4,7 +4,7 @@ ALERTAINTRUSO — ALARME INTELIGENTE POR VISÃO COMPUTACIONAL (RTSP • YOLO •
 ================================================================================
 Arquivo:        AlertaIntruso Claude+GPT.py
 Projeto:        Sistema de Alarme Inteligente por Visão Computacional
-Versão:         4.3.3
+Versão:         4.3.4
 Data:           02/02/2026
 Autor:          Fabio Bettio
 Licença:        Uso educacional / experimental
@@ -23,7 +23,7 @@ de movimento.
 Changelog completo
 ================================================================================
 
-v4.2.4 (02/02/2026) [UI POLISH] (linhas: 0) (base v4.3.2)
+v4.2.4 (02/02/2026) [UI POLISH] (linhas: 0) (base v4.3.3)
     - NOVO: Spinner animado de loading durante conexão/boot das câmeras
     - NOVO: Indicadores de status descritivos (Iniciando, Conectando, Sem sinal)
     - NOVO: Logo ⊘ para câmeras desativadas na configuração
@@ -152,7 +152,7 @@ def set_ffmpeg_capture_options(transport: str = "udp") -> None:
 
 set_ffmpeg_capture_options("udp")
 
-APP_VERSION = "4.3.3"
+APP_VERSION = "4.3.4"
 MAX_THUMBS = 200
 
 # ----------------------------- Tips do Menu de Configurações -----------------------------
@@ -1282,6 +1282,7 @@ class InterfaceGrafica:
         self.config["TELEGRAM"]["alert_mode"] = self.cb_alert.get().strip()
 
         self.config["UI"]["show_tips"] = str(bool(self.var_show_tips.get()))
+        self.config["UI"]["auto_scroll_logs"] = str(bool(self.var_auto_scroll.get()))
 
         with open(self.config_file, "w", encoding="utf-8") as f:
             self.config.write(f)
@@ -1407,6 +1408,9 @@ class InterfaceGrafica:
             command=self._toggle_tips_visibility
         )
         self.cb_tips.pack(side="left")
+        
+        # Inicializar variável de auto-scroll dos logs
+        self.var_auto_scroll = tk.BooleanVar(value=self.config["UI"].getboolean("auto_scroll_logs", fallback=True))
 
         ttk.Label(tips_frame, text="— Ative para exibir explicações de cada parâmetro", foreground="gray").pack(side="left", padx=10)
 
@@ -1662,13 +1666,27 @@ class InterfaceGrafica:
         self.thumb_items = []
 
     def _build_logs_tab(self):
+        # Frame superior para controles
+        control_frame = ttk.Frame(self.frame_logs)
+        control_frame.pack(fill="x", padx=6, pady=6)
+        
+        # Checkbox de auto-scroll
+        self.cb_auto_scroll = ttk.Checkbutton(
+            control_frame, text="Auto-scroll automático",
+            variable=self.var_auto_scroll
+        )
+        self.cb_auto_scroll.pack(side="left", padx=4)
+        
+        # Botão limpar
+        ttk.Button(control_frame, text="Limpar Logs", command=lambda: self.text_logs.delete("1.0", tk.END)).pack(side="left", padx=4)
+        
+        # Text widget com scroll
         self.text_logs = scrolledtext.ScrolledText(self.frame_logs, wrap=tk.WORD, font=("Courier", 9))
         self.text_logs.pack(fill="both", expand=True, padx=6, pady=6)
         
         # Configurar cores para diferentes níveis de log
         self.text_logs.tag_config("ERROR", foreground="#FF0000")  # Vermelho
         self.text_logs.tag_config("WARN", foreground="#FF8C00")   # Laranja escuro
-        ttk.Button(self.frame_logs, text="Limpar", command=lambda: self.text_logs.delete("1.0", tk.END)).pack(pady=4)
 
     def _build_performance_tab(self):
         columns = ("Câmera", "FPS", "Tx (Mbps/MB/s)", "Latência (ms)", "Jitter (ms)", "Ping (ms)", "Perda (%)", "Proto", "CPU (%)", "RAM (%)")
@@ -1842,7 +1860,9 @@ class InterfaceGrafica:
                 lines = f.readlines()[-200:]
             for ln in lines:
                 self.text_logs.insert(tk.END, ln)
-            self.text_logs.see(tk.END)
+            # Scroll automático apenas se checkbox estiver ativado
+            if self.var_auto_scroll.get():
+                self.text_logs.see(tk.END)
         except Exception:
             pass
 
@@ -1874,7 +1894,9 @@ class InterfaceGrafica:
                         self.text_logs.insert(tk.END, line, "WARN")
                     else:
                         self.text_logs.insert(tk.END, line)
-                    self.text_logs.see(tk.END)
+                    # Scroll automático apenas se checkbox estiver ativado
+                    if self.var_auto_scroll.get():
+                        self.text_logs.see(tk.END)
                 except Exception:
                     pass
         except queue.Empty:
