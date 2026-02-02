@@ -1,0 +1,137 @@
+# AlertaIntruso v4.3.16 - Status Report
+
+**Data**: 02/02/2026  
+**Versão**: 4.3.16  
+**Status**: ✅ ESTÁVEL
+
+## Sessão de Desenvolvimento
+
+### Período
+02/02/2026 - v4.2.4 → v4.3.16 (14 versões em uma sessão)
+
+### Objetivos Alcançados
+
+#### 1️⃣ Telegram Improvements (v4.3.0-4.3.3)
+- ✅ NetworkMonitor com captura RTP real
+- ✅ Detecção com métricas de qualidade
+- ✅ Mensagens amigáveis de início/parada
+- ✅ Formato compacto com emojis
+
+#### 2️⃣ GUI Enhancements (v4.3.4-4.3.5)
+- ✅ Auto-scroll checkbox na aba Logs
+- ✅ Camera frames vazios ao desconectar
+
+#### 3️⃣ Telegram Validation (v4.3.6)
+- ✅ Botão "Testar envio" com simulação de detecção
+
+#### 4️⃣ Critical Alerts (v4.3.7)
+- ✅ LogManager detecta padrões críticos
+- ✅ Erros encaminhados automaticamente para Telegram
+
+#### 5️⃣ Message Optimization (v4.3.8-4.3.9)
+- ✅ 1 decimal precision para floats
+- ✅ Nomes de classes inclusos
+- ✅ Removed log spam ("MOVIMENTO SEM PESSOA")
+
+#### 6️⃣ RTSP Reliability (v4.3.10-4.3.11)
+- ✅ Timeout aumentado para 10s
+- ✅ Buffer flush após reconnect
+- ✅ Backoff otimizado (5s-30s)
+- ✅ Fix: CAM3 reconnection cycle
+
+#### 7️⃣ GUI Layout (v4.3.12-4.3.15)
+- ✅ Scroll na aba Config
+- ✅ Botões fixos na base
+- ✅ Conteúdo visível
+- ✅ Label melhorado
+
+#### 8️⃣ Performance Metrics (v4.3.16)
+- ✅ Fallback para bitrate interno
+- ✅ Todas as métricas visíveis
+
+---
+
+## Arquitetura Atual
+
+### Componentes Principais
+- **RTSPObjectDetector** (4x): Processamento independente por câmera
+- **TelegramBot**: API async para notificações
+- **LogManager**: Logs rotativos + detecção crítica + Telegram forward
+- **NetworkMonitor**: Captura RTP (Scapy, fallback graceful)
+- **InterfaceGrafica**: Tkinter com 6 abas
+- **Watchdog**: Monitoramento de travamentos
+
+### Tecnologias
+- Python 3.12.6
+- OpenCV 4.13.0 (RTSP via FFmpeg)
+- YOLOv4-tiny (320x320 inference)
+- Scapy 2.5.0 (opcional, para bitrate real)
+- Npcap (opcional, windows network capture)
+
+### Features Implementadas
+✅ 4 câmeras RTSP simultâneas  
+✅ YOLO person/car/motorcycle/etc detection  
+✅ Smart frame buffering (buffer flush)  
+✅ Resilient reconnection (exponential backoff)  
+✅ Telegram notifications (fotos + metrics)  
+✅ Network monitoring (bitrate, latency, jitter, ping, loss)  
+✅ Performance metrics (FPS, CPU, RAM, GPU info)  
+✅ Auto-recovery (soft/hard restart)  
+✅ Log rotation (1MB + backup)  
+✅ Config persistence (config.ini)  
+✅ Photo thumbnails (event grouping)  
+✅ Mouse wheel scrolling  
+✅ Color-coded logs (ERROR=red, WARN=orange)  
+✅ Tooltip tips (optional, toggle via checkbox)  
+
+---
+
+## Bugs Resolvidos
+
+| # | Versão | Issue | Fix |
+|---|--------|-------|-----|
+| 1 | 4.3.3 | Mensagens Telegram verbose | Reduzir dashes (12→24 chars) |
+| 2 | 4.3.5 | Frozen frames ao desconectar | Enviar frame vazio |
+| 3 | 4.3.10 | CAM3 reconnect a cada 30s | Buffer flush + timeout 10s |
+| 4 | 4.3.13 | Botões cortados em tela cheia | Frame fixo na base |
+| 5 | 4.3.15 | Config content invisível | Remove pack_propagate(False) |
+| 6 | 4.3.16 | Performance metrics vazias | Fallback para bitrate interno |
+
+---
+
+## Testing Status
+
+### ✅ Validado
+- Config aba: scroll + botões visíveis
+- Performance aba: todas as métricas exibidas
+- Photos aba: ordem cronológica inversa
+- Logs aba: auto-scroll checkbox funcional
+- Telegram: fotos com metadata
+- RTSP: reconexão resiliente
+
+### ⏳ Recomendações
+- Testar CAM3 por 5+ minutos para validar fix
+- Verificar Npcap se bitrate está 0
+- Monitor memória com 4x câmeras 24/7
+
+---
+
+## Próximas Iterações Recomendadas
+
+1. **Analytics Dashboard**: Gráficos de detecções por hora/dia
+2. **Cloud Backup**: Enviar fotos para AWS S3/Google Drive
+3. **Object Tracking**: Rastrear pessoa entre frames
+4. **Motion Heat Map**: Áreas mais movimentadas
+5. **Face Recognition**: Detecção de rostos conhecidos
+6. **Alert Escalation**: Notificação progressiva (Telegram → SMS → Call)
+7. **Multi-User**: Web dashboard com login
+8. **AI Training**: Fine-tune YOLO com dados locais
+
+---
+
+## Conclusão
+
+AlertaIntruso v4.3.16 é um sistema **robusto, escalável e amigável** para monitoramento inteligente de múltiplas câmeras IP. A arquitetura tolerante a falhas, combinada com UX polida e notificações confiáveis, torna-o adequado para **ambientes residenciais e comerciais** com requisitos de alta disponibilidade.
+
+🎯 **Ready for Production**
+

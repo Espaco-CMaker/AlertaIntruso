@@ -1,0 +1,102 @@
+# CHANGELOG - AlertaIntruso
+
+## v4.3.16 (02/02/2026)
+### 🐛 Correções
+- **Performance**: Fallback para bitrate interno se NetworkMonitor indisponível
+- Aba Performance agora exibe todas as métricas mesmo sem Scapy/Npcap
+
+## v4.3.15 (02/02/2026)
+### 🔧 Correções
+- **GUI**: Conteúdo da aba Config agora visível com scroll funcional
+- Botões de controle fixos na base (não afetados pelo scroll)
+
+## v4.3.14 (02/02/2026)
+### ✨ Melhorias
+- **GUI**: Fotos mais novas aparecem primeiro na aba Fotos
+- Eventos antigos descem automaticamente
+
+## v4.3.13 (02/02/2026)
+### ✨ Melhorias
+- **GUI**: Botões de controle (Salvar, Recarregar, Iniciar, Parar) agora fixos na base
+- Não são mais cortados mesmo em tela cheia
+
+## v4.3.12 (02/02/2026)
+### ✨ Melhorias
+- **GUI**: Scroll na aba Config para facilitar navegação
+- Label melhorado: "Intervalo mín. entre fotos (s)" mais descritivo
+- Mouse wheel support para scroll suave
+
+## v4.3.11 (02/02/2026)
+### ✨ Otimizações
+- **RTSP**: Backoff inicial aumentado de 2s para 5s
+- Máximo de backoff aumentado de 20s para 30s
+- Reduz ciclos rápidos de reconexão
+
+## v4.3.10 (02/02/2026)
+### 🔧 Correções
+- **RTSP**: Timeout aumentado de 5s para 10s
+- Buffer flush após reconectar (10 frames) para descartar dados stale
+- Corrige problema de CAM3 reconnectando a cada ~30s
+
+## v4.3.9 (02/02/2026)
+### ✨ Melhorias
+- **Detections**: Nomes de classes agora inclusos na mensagem Telegram
+- Removido log "MOVIMENTO SEM PESSOA" (reduz spam)
+- Mensagens mais compactas e focadas
+
+## v4.3.8 (01/02/2026)
+### ✨ Melhorias
+- **Telegram**: Reduzida quantidade de dados por foto (1 decimal para floats)
+- Precisão suficiente, economia de bandwidth
+
+## v4.3.7 (01/02/2026)
+### ✨ Melhorias
+- **LogManager**: Detecta padrões críticos ("falha rtsp", "sem frame", etc)
+- Erros críticos automaticamente encaminhados para Telegram
+- Status operacional em tempo real
+
+## v4.3.6 (01/02/2026)
+### ✨ Novos
+- **Telegram**: Botão "Testar envio" na aba Config
+- Simula detecção com foto de teste para validar conexão
+
+## v4.3.5 (01/02/2026)
+### 🔧 Correções
+- **GUI**: Camera frames agora vazios ao desconectar (sem frozen frames)
+- Melhora visual quando há problema de conexão
+
+## v4.3.4 (01/02/2026)
+### ✨ Melhorias
+- **GUI**: Checkbox "Auto-scroll automático" na aba Logs
+- Persiste em config.ini
+- Melhora UX para debugging
+
+## v4.3.3 (31/01/2026)
+### ✨ Melhorias
+- **Telegram**: Reduzido separador de dashes (12 chars ao invés de 24)
+- Mensagens mais compactas e limpas
+
+## v4.3.2 (31/01/2026)
+### ✨ Melhorias
+- **Telegram**: Mensagens de início/parada do sistema mais amigáveis
+- Formato: ✅ SISTEMA INICIADO / ⏹️ SISTEMA ENCERRADO
+- Inclui emojis para melhor visualização
+
+## v4.3.1 (31/01/2026)
+### ✨ Melhorias
+- **Telegram**: Detecção com métricas de qualidade
+- Timestamp, confiança, FPS, latência
+- Formato organizado e legível
+
+## v4.3.0 (30/01/2026)
+### ✨ Novos
+- **NetworkMonitor**: Captura RTP em tempo real (Scapy)
+- Bitrate real das câmeras
+- Métricas avançadas de rede (latência, jitter, ping, perda)
+
+## v4.2.4+ (Versões anteriores)
+- Spinner animado de loading
+- Indicadores de status descritivos
+- Taxa de transferência em Mbps/MB/s
+- Logs coloridos (ERROR em vermelho, WARN em laranja)
+- Métricas avançadas de rede na aba Performance
