@@ -357,8 +357,20 @@ class LogManager:
                 try:
                     self._sending_telegram = True
                     cam_text = f"📹 Câmera {cam}" if cam is not None else "📹 Câmera: N/D"
+                    
+                    # Emoji de nível baseado no tipo de alerta
+                    if "RTSP" in msg.upper() or "CONEXÃO" in msg.upper() or "DESCONECT" in msg.upper():
+                        level_emoji = "🔴"  # Vermelho para problemas críticos
+                        alert_title = "ALERTA CRÍTICO"
+                    elif "reconnect" in msg.lower() or "fallha" in msg.lower():
+                        level_emoji = "🟠"  # Laranja para warnings
+                        alert_title = "AVISO"
+                    else:
+                        level_emoji = "🟡"  # Amarelo para informações críticas
+                        alert_title = "ALERTA"
+                    
                     caption = (
-                        "🚨 ALERTA CRÍTICO\n"
+                        f"{level_emoji} {alert_title}\n"
                         f"{'━' * 12}\n"
                         f"{cam_text}\n"
                         f"⏰ {ts}\n"
@@ -763,7 +775,7 @@ class RTSPObjectDetector:
             real_bitrate = self.network_monitor.get_bitrate(self.cam_id) if self.network_monitor else 0.0
             
             timestamp_formatted = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-            conf_pct = conf_avg * 100
+            conf_pct = (conf_avg * 100) if conf_avg > 0 else 0
             
             # Formatar FPS e latência com 1 casa decimal
             fps = perf.get('fps', 0)
@@ -778,14 +790,22 @@ class RTSPObjectDetector:
             else:
                 detection_text = "pessoa"
             
-            # Construir caption formatado (reduzido)
+            # Emoji de status baseado em confiança
+            if conf_pct >= 70:
+                confidence_emoji = "🟢"  # Verde - alta confiança
+            elif conf_pct >= 50:
+                confidence_emoji = "🟡"  # Amarelo - média confiança
+            else:
+                confidence_emoji = "🟠"  # Laranja - baixa confiança
+            
+            # Construir caption formatado (com cores via emojis)
             caption = (
-                f"🚨 ALERTA DE DETECÇÃO\n"
+                f"🟢 ALERTA DE DETECÇÃO\n"
                 f"{'━' * 12}\n"
                 f"📹 Câmera {self.cam_id}\n"
                 f"⏰ {timestamp_formatted}\n"
                 f"🔍 Detectado: {detection_text}\n"
-                f"📊 Confiança: {conf_pct:.1f}%\n"
+                f"{confidence_emoji} Confiança: {conf_pct:.1f}%\n"
                 f"📡 FPS: {fps_str} | Latência: {latency_str}ms\n"
                 f"v{APP_VERSION}"
             )
