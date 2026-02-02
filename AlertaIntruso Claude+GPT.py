@@ -1448,8 +1448,8 @@ class InterfaceGrafica:
         # Armazenar referência de widgets para mostrar/esconder tooltips
         self.tip_widgets = []
 
-        # Canvas com Scrollbar para Config
-        canvas = tk.Canvas(self.frame_config, bg="white")
+        # Canvas com Scrollbar para Config (ocupa a maior parte)
+        canvas = tk.Canvas(self.frame_config, bg="white", highlightthickness=0)
         scrollbar = ttk.Scrollbar(self.frame_config, orient="vertical", command=canvas.yview)
         wrap = ttk.Frame(canvas)
 
@@ -1465,8 +1465,13 @@ class InterfaceGrafica:
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
 
-        # Adicionar padding ao wrap interno
-        wrap.pack_configure(padx=10, pady=10)
+        # Frame para botões (fixo na base, não faz scroll)
+        bottom_frame = ttk.Frame(self.frame_config)
+        bottom_frame.pack(side="bottom", fill="x", padx=6, pady=6)
+
+        # Padding no wrap
+        wrap.pack_propagate(False)
+        ttk.Label(wrap).pack()  # Espaço superior
 
         # ========== CHECKBOX DE TIPS ==========
         tips_frame = ttk.Frame(wrap)
@@ -1659,9 +1664,8 @@ class InterfaceGrafica:
         self.btn_test_telegram.grid(row=3, column=1, padx=6, pady=(6, 2), sticky="w")
 
         # ========== CONTROLES ==========
-        ctrl = ttk.Frame(wrap)
-        ctrl.pack(fill="x", pady=10)
-
+        ctrl = bottom_frame
+        
         self.btn_save = ttk.Button(ctrl, text="Salvar (reinicia)", command=self.save_and_restart)
         self.btn_save.pack(side="left", padx=6)
 
