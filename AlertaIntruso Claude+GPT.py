@@ -4,7 +4,7 @@ ALERTAINTRUSO — ALARME INTELIGENTE POR VISÃO COMPUTACIONAL (RTSP • YOLO •
 ================================================================================
 Arquivo:        AlertaIntruso Claude+GPT.py
 Projeto:        Sistema de Alarme Inteligente por Visão Computacional
-Versão:         4.3.0
+Versão:         4.3.1
 Data:           02/02/2026
 Autor:          Fabio Bettio
 Licença:        Uso educacional / experimental
@@ -152,7 +152,7 @@ def set_ffmpeg_capture_options(transport: str = "udp") -> None:
 
 set_ffmpeg_capture_options("udp")
 
-APP_VERSION = "4.3.0"
+APP_VERSION = "4.3.1"
 MAX_THUMBS = 200
 
 # ----------------------------- Tips do Menu de Configurações -----------------------------
@@ -676,7 +676,32 @@ class RTSPObjectDetector:
                 self.log.log("ERROR", f"Erro no callback de foto: {e}", self.cam_id)
 
         if self.telegram_mode in ("all", "detections") and self.telegram.enabled:
-            caption = f"DETECCAO PESSOA | CAM{self.cam_id} | pessoas={person_count} | conf={conf_avg:.0%} | v{APP_VERSION}"
+            # Construir mensagem amigável com dados importantes
+            perf = self.last_performance or {}
+            real_bitrate = self.network_monitor.get_bitrate(self.cam_id) if self.network_monitor else 0.0
+            
+            timestamp_formatted = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+            conf_pct = conf_avg * 100
+            
+            # Construir caption formatado
+            caption = (
+                f"🚨 ALERTA DE DETECÇÃO\n"
+                f"{'━' * 24}\n"
+                f"📹 Câmera {self.cam_id}\n"
+                f"⏰ {timestamp_formatted}\n"
+                f"👤 {person_count} pessoa{'s' if person_count != 1 else ''} detectada{'s' if person_count != 1 else ''}\n"
+                f"📊 Confiança: {conf_pct:.1f}%\n"
+                f"{'━' * 24}\n"
+                f"📡 Qualidade do Stream:\n"
+                f"  • FPS: {perf.get('fps', 'N/A')}\n"
+                f"  • Taxa: {real_bitrate:.2f} Mbps\n"
+                f"  • Latência: {perf.get('latency', 'N/A')}ms\n"
+                f"  • Protocolo: {perf.get('protocol', 'UDP')}\n"
+                f"{'━' * 24}\n"
+                f"🔑 Evento: {event_uid[:8]}... | Shot: {shot_idx}\n"
+                f"v{APP_VERSION}"
+            )
+            
             ok = self.telegram.enviar_foto(str(path), caption)
             if ok:
                 self.log.log("INFO", "Foto enviada Telegram.", self.cam_id)
