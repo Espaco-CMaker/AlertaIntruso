@@ -4,7 +4,7 @@ ALERTAINTRUSO — ALARME INTELIGENTE POR VISÃO COMPUTACIONAL (RTSP • YOLO •
 ================================================================================
 Arquivo:        AlertaIntruso Claude+GPT.py
 Projeto:        Sistema de Alarme Inteligente por Visão Computacional
-Versão:         4.3.1
+Versão:         4.3.2
 Data:           02/02/2026
 Autor:          Fabio Bettio
 Licença:        Uso educacional / experimental
@@ -23,7 +23,7 @@ de movimento.
 Changelog completo
 ================================================================================
 
-v4.2.4 (02/02/2026) [UI POLISH] (linhas: 0) (base v4.3.0)
+v4.2.4 (02/02/2026) [UI POLISH] (linhas: 0) (base v4.3.1)
     - NOVO: Spinner animado de loading durante conexão/boot das câmeras
     - NOVO: Indicadores de status descritivos (Iniciando, Conectando, Sem sinal)
     - NOVO: Logo ⊘ para câmeras desativadas na configuração
@@ -152,7 +152,7 @@ def set_ffmpeg_capture_options(transport: str = "udp") -> None:
 
 set_ffmpeg_capture_options("udp")
 
-APP_VERSION = "4.3.1"
+APP_VERSION = "4.3.2"
 MAX_THUMBS = 200
 
 # ----------------------------- Tips do Menu de Configurações -----------------------------
@@ -363,6 +363,28 @@ class TelegramBot:
             if self.log:
                 self.log.log("ERROR", f"Erro ao enviar foto Telegram: {e}")
             return False
+
+    def formatar_msg_inicio(self, cameras_ativas: int, versao: str) -> str:
+        """Formata mensagem amigável de início do sistema."""
+        return (
+            f"✅ SISTEMA INICIADO\n"
+            f"{'━' * 24}\n"
+            f"🎥 Câmeras ativas: {cameras_ativas}\n"
+            f"🚀 Status: Monitorando\n"
+            f"v{versao}\n"
+            f"{'━' * 24}"
+        )
+
+    def formatar_msg_encerramento(self, total_deteccoes: int, versao: str) -> str:
+        """Formata mensagem amigável de encerramento do sistema."""
+        return (
+            f"⏹️ SISTEMA ENCERRADO\n"
+            f"{'━' * 24}\n"
+            f"👤 Detecções registradas: {total_deteccoes}\n"
+            f"✓ Monitoramento finalizado\n"
+            f"v{versao}\n"
+            f"{'━' * 24}"
+        )
 
 
 # ----------------------------- Detector (1 câmera) -----------------------------
@@ -2127,7 +2149,8 @@ class InterfaceGrafica:
         mode = self.config["TELEGRAM"].get("alert_mode", "detections")
         if mode == "none":
             return
-        self.telegram.enviar_mensagem(f"SISTEMA INICIADO v{APP_VERSION} | cams_ativas={active_count}")
+        msg = self.telegram.formatar_msg_inicio(active_count, APP_VERSION)
+        self.telegram.enviar_mensagem(msg)
 
     def _send_telegram_system_stop(self, total_detections: int):
         if not self.telegram.enabled:
@@ -2135,7 +2158,8 @@ class InterfaceGrafica:
         mode = self.config["TELEGRAM"].get("alert_mode", "detections")
         if mode == "none":
             return
-        self.telegram.enviar_mensagem(f"SISTEMA ENCERRADO v{APP_VERSION} | deteccoes={total_detections}")
+        msg = self.telegram.formatar_msg_encerramento(total_detections, APP_VERSION)
+        self.telegram.enviar_mensagem(msg)
 
     def start_system(self):
         if self.running:
