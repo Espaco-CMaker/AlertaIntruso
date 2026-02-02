@@ -1881,14 +1881,18 @@ class InterfaceGrafica:
                     ping = perf.get("ping", 0)
                     frame_loss = perf.get("frame_loss", 0)
                     protocol = perf.get("protocol", "?")
-
-                    # Usar bitrate real do Network Monitor
-                    bitrate_real = self.network_monitor.get_bitrate(cam)
-                    bitrate_mbs = bitrate_real / 1_000_000 if bitrate_real > 0 else 0.0
+                    
+                    # Tentar usar bitrate do Network Monitor, caso contrário usar o calculado internamente
+                    bitrate_real = self.network_monitor.get_bitrate(cam) if hasattr(self.network_monitor, "get_bitrate") else 0
+                    if bitrate_real == 0:
+                        # Fallback: usar bitrate calculado internamente
+                        bitrate_mbs = perf.get("bitrate", 0) / 8.0 if perf.get("bitrate", 0) > 0 else 0.0
+                    else:
+                        bitrate_mbs = bitrate_real / 1_000_000
                     bitrate_mbps = bitrate_mbs * 8.0
 
                     fps_text = f"{fps:.1f}" + (" ⚠" if fps < 10 else "")
-                    bitrate_text = f"{bitrate_mbps:.2f}Mbps ({bitrate_mbs:.2f}MB/s)" if bitrate_real > 0 else "--"
+                    bitrate_text = f"{bitrate_mbps:.2f}Mbps ({bitrate_mbs:.2f}MB/s)" if bitrate_mbps > 0 else "--"
                     latency_text = f"{latency:.0f}ms" + (" ⚠" if latency > 100 else "") if latency > 0 else "--"
                     jitter_text = f"{jitter:.0f}ms" + (" ⚠" if jitter > 30 else "") if jitter > 0 else "--"
                     ping_text = f"{ping:.0f}ms" + (" ⚠" if ping > 100 else "") if ping > 0 else "--"
