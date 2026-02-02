@@ -710,9 +710,12 @@ class RTSPObjectDetector:
         f_boxes, f_confs, f_cids = [], [], []
         if len(idxs) > 0:
             for i in idxs.flatten():
-                f_boxes.append(boxes[i])
-                f_confs.append(confs[i])
-                f_cids.append(cids[i])
+                # Validação adicional: garantir que a confiança está acima do threshold
+                # (NMSBoxes remove overlaps, não filtra por threshold)
+                if confs[i] >= self.conf_th:
+                    f_boxes.append(boxes[i])
+                    f_confs.append(confs[i])
+                    f_cids.append(cids[i])
 
         inf_time = time.monotonic() - start_inf
         return f_boxes, f_confs, f_cids, inf_time
