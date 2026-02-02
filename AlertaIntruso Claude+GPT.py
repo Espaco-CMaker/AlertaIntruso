@@ -646,8 +646,8 @@ class RTSPObjectDetector:
             cap = cv2.VideoCapture()
 
             try:
-                cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 5000)
-                cap.set(cv2.CAP_PROP_READ_TIMEOUT_MSEC, 5000)
+                cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 10000)  # 10s timeout para abrir
+                cap.set(cv2.CAP_PROP_READ_TIMEOUT_MSEC, 10000)  # 10s timeout para ler (evita falhas por timeout curto)
             except Exception:
                 pass
 
@@ -659,6 +659,15 @@ class RTSPObjectDetector:
             ok = cap.open(self.rtsp_url, cv2.CAP_FFMPEG)
             if not ok or (not cap.isOpened()):
                 raise Exception("Não abriu stream RTSP")
+
+            # Limpar buffer após reconectar (descartar frames antigos/corrompidos)
+            try:
+                for _ in range(10):
+                    ret, _ = cap.read()
+                    if not ret:
+                        break
+            except Exception:
+                pass
 
             self.cap = cap
             self.log.log("INFO", "RTSP OK.", self.cam_id)
