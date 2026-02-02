@@ -1448,8 +1448,25 @@ class InterfaceGrafica:
         # Armazenar referência de widgets para mostrar/esconder tooltips
         self.tip_widgets = []
 
-        wrap = ttk.Frame(self.frame_config)
-        wrap.pack(fill="both", expand=True, padx=10, pady=10)
+        # Canvas com Scrollbar para Config
+        canvas = tk.Canvas(self.frame_config, bg="white")
+        scrollbar = ttk.Scrollbar(self.frame_config, orient="vertical", command=canvas.yview)
+        wrap = ttk.Frame(canvas)
+
+        wrap.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        canvas.create_window((0, 0), window=wrap, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        # Mouse wheel scroll
+        def on_mousewheel(event):
+            canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+        canvas.bind_all("<MouseWheel>", on_mousewheel)
+
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        # Adicionar padding ao wrap interno
+        wrap.pack_configure(padx=10, pady=10)
 
         # ========== CHECKBOX DE TIPS ==========
         tips_frame = ttk.Frame(wrap)
@@ -1537,7 +1554,7 @@ class InterfaceGrafica:
         self._add_tooltip_to_widget(lbl_photos, CONFIGURATION_TIPS["photos"])
         self._add_tooltip_to_widget(self.sp_photos, CONFIGURATION_TIPS["photos"])
 
-        lbl_min_capture = ttk.Label(det, text="Min. entre capturas (s):")
+        lbl_min_capture = ttk.Label(det, text="Intervalo mín. entre fotos (s):")
         lbl_min_capture.grid(row=1, column=0, sticky="w")
         self.sp_min_capture = ttk.Spinbox(det, from_=0.2, to=10.0, increment=0.1, width=8)
         self.sp_min_capture.grid(row=1, column=1, padx=6, pady=4, sticky="w")
