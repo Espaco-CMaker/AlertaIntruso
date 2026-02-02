@@ -4,7 +4,7 @@ ALERTAINTRUSO — ALARME INTELIGENTE POR VISÃO COMPUTACIONAL (RTSP • YOLO •
 ================================================================================
 Arquivo:        AlertaIntruso Claude+GPT.py
 Projeto:        Sistema de Alarme Inteligente por Visão Computacional
-Versão:         4.2.3 (base 4.2.2)
+Versão:         4.2.4 (base 4.2.3)
 Data:           02/02/2026
 Autor:          Fabio Bettio
 Licença:        Uso educacional / experimental
@@ -22,6 +22,14 @@ de movimento.
 ================================================================================
 Changelog completo
 ================================================================================
+
+v4.2.4 (02/02/2026) [UI POLISH] (linhas: 0) (base v4.2.3)
+    - NOVO: Spinner animado de loading durante conexão/boot das câmeras
+    - NOVO: Indicadores de status descritivos (Iniciando, Conectando, Sem sinal)
+    - NOVO: Logo ⊘ para câmeras desativadas na configuração
+    - MELHORIA: Taxa de transferência em Mbps/MB/s com estimativa JPEG
+    - MELHORIA: Tooltips informativos no cabeçalho da tabela Performance
+    - NOVO: Logs coloridos (vermelho para ERROR, laranja para WARN)
 
 v4.2.3 (02/02/2026) [NETWORK + UI] (linhas: 0) (base v4.2.2)
     - NOVO: Métricas avançadas de rede na aba Performance
@@ -138,7 +146,7 @@ def set_ffmpeg_capture_options(transport: str = "udp") -> None:
 
 set_ffmpeg_capture_options("udp")
 
-APP_VERSION = "4.2.3"
+APP_VERSION = "4.2.4"
 MAX_THUMBS = 200
 
 # ----------------------------- Tips do Menu de Configurações -----------------------------
@@ -1164,6 +1172,11 @@ class InterfaceGrafica:
         self.cam_status_labels = {}
         self.cam_transport_labels = {}
         self.cam_rtsp_labels = {}
+        self.cam_spinners = {}  # Spinners de loading
+        self.cam_spinner_texts = {}  # Textos animados dos spinners
+        self.cam_spinner_index = {}  # Índice atual da animação
+        self.cam_spinner_status_labels = {}  # Labels com status texto do spinner
+        self.cam_disabled_labels = {}  # Labels para câmeras desativadas
 
         positions = {1: (0, 0), 2: (0, 1), 3: (1, 0), 4: (1, 1)}
         for cam_id, (r, c) in positions.items():
@@ -1201,6 +1214,23 @@ class InterfaceGrafica:
 
             lbl = tk.Label(cell, bg="black")
             lbl.pack(fill="both", expand=True)
+
+            # Overlay com spinner de loading
+            spinner_overlay = tk.Label(lbl, bg="black", text="", font=("Arial", 24, "bold"), fg="#00FF00")
+            spinner_overlay.place(relx=0.5, rely=0.45, anchor="center")
+            self.cam_spinners[cam_id] = spinner_overlay
+            self.cam_spinner_texts[cam_id] = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+            self.cam_spinner_index[cam_id] = 0
+
+            # Status texto do spinner
+            spinner_status = tk.Label(lbl, bg="black", text="", font=("Arial", 9), fg="#AAAAAA")
+            spinner_status.place(relx=0.5, rely=0.55, anchor="center")
+            self.cam_spinner_status_labels[cam_id] = spinner_status
+
+            # Label para câmera desativada
+            disabled_label = tk.Label(lbl, bg="black", text="", font=("Arial", 28, "bold"), fg="#555555")
+            disabled_label.place(relx=0.5, rely=0.45, anchor="center")
+            self.cam_disabled_labels[cam_id] = disabled_label
 
             self.cam_cells[cam_id] = cell
             self.cam_labels[cam_id] = lbl
@@ -1664,6 +1694,7 @@ class InterfaceGrafica:
             while True:
                 cam_id, frame_bgr = self.frame_queue.get_nowait()
                 self._update_cam_frame(cam_id, frame_bgr)
+                self._hide_spinner(cam_id)  # Esconder spinner quando tem frame
         except queue.Empty:
             pass
 
@@ -1691,6 +1722,7 @@ class InterfaceGrafica:
         except queue.Empty:
             pass
 
+        self._update_spinners()  # Animar spinners
         self.root.after(40, self._process_queues)
 
     # ---------------- VIDEO RENDER ----------------
@@ -1721,6 +1753,80 @@ class InterfaceGrafica:
 
         lbl.imgtk = imgtk
         lbl.configure(image=imgtk)
+
+    def _hide_spinner(self, cam_id: int):
+        """Esconde spinner quando câmera recebe frames"""
+        if cam_id in self.cam_spinners:
+            try:
+                self.cam_spinners[cam_id].config(text="")
+                self.cam_spinner_status_labels[cam_id].config(text="")
+                self.cam_disabled_labels[cam_id].config(text="")
+            except Exception:
+                pass
+
+    def _update_spinners(self):
+        """Anima spinners de loading para câmeras offline/conectando"""
+        status_messages = {
+            "offline": "Iniciando stream...",
+            "online": "Conectando...",
+            "frozen": "Sem sinal",
+            "receiving": ""
+        }
+        
+        for cam_id in range(1, 5):
+            if cam_id not in self.cam_spinners:
+                continue
+            
+            # Verificar se câmera está desativada na config
+            is_enabled = self.config[f"CAM{cam_id}"].getboolean("enabled", fallback=True)
+            
+            spinner = self.cam_spinners[cam_id]
+            status_label = self.cam_spinner_status_labels[cam_id]
+            disabled_label = self.cam_disabled_labels[cam_id]
+            
+            if not is_enabled:
+                # Câmera desativada: mostrar logo de desativação
+                try:
+                    spinner.config(text="")
+                    status_label.config(text="")
+                    disabled_label.config(text="⊘")  # Símbolo de desativado
+                    spinner.place_forget()
+                    status_label.place_forget()
+                    disabled_label.place(relx=0.5, rely=0.5, anchor="center")
+                except Exception:
+                    pass
+                continue
+            
+            det = self.detectors.get(cam_id)
+            if not det:
+                continue
+
+            status = getattr(det, "status", "offline")
+
+            if status in ("offline", "online", "frozen"):
+                try:
+                    idx = self.cam_spinner_index.get(cam_id, 0)
+                    frames = self.cam_spinner_texts.get(cam_id, [])
+                    if frames:
+                        spinner.config(text=frames[idx % len(frames)])
+                        self.cam_spinner_index[cam_id] = (idx + 1) % len(frames)
+                    status_label.config(text=status_messages.get(status, "Aguardando..."))
+                    disabled_label.config(text="")
+                    spinner.place(relx=0.5, rely=0.45, anchor="center")
+                    status_label.place(relx=0.5, rely=0.55, anchor="center")
+                    disabled_label.place_forget()
+                except Exception:
+                    pass
+            else:
+                try:
+                    spinner.config(text="")
+                    status_label.config(text="")
+                    disabled_label.config(text="")
+                    spinner.place_forget()
+                    status_label.place_forget()
+                    disabled_label.place_forget()
+                except Exception:
+                    pass
 
     def _update_camera_status(self):
         """Atualiza indicadores de status das câmeras (online, receiving, frozen)"""
