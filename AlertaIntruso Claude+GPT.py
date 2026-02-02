@@ -4,7 +4,7 @@ ALERTAINTRUSO — ALARME INTELIGENTE POR VISÃO COMPUTACIONAL (RTSP • YOLO •
 ================================================================================
 Arquivo:        AlertaIntruso Claude+GPT.py
 Projeto:        Sistema de Alarme Inteligente por Visão Computacional
-Versão:         4.3.2
+Versão:         4.3.3
 Data:           02/02/2026
 Autor:          Fabio Bettio
 Licença:        Uso educacional / experimental
@@ -23,7 +23,7 @@ de movimento.
 Changelog completo
 ================================================================================
 
-v4.2.4 (02/02/2026) [UI POLISH] (linhas: 0) (base v4.3.1)
+v4.2.4 (02/02/2026) [UI POLISH] (linhas: 0) (base v4.3.2)
     - NOVO: Spinner animado de loading durante conexão/boot das câmeras
     - NOVO: Indicadores de status descritivos (Iniciando, Conectando, Sem sinal)
     - NOVO: Logo ⊘ para câmeras desativadas na configuração
@@ -152,7 +152,7 @@ def set_ffmpeg_capture_options(transport: str = "udp") -> None:
 
 set_ffmpeg_capture_options("udp")
 
-APP_VERSION = "4.3.2"
+APP_VERSION = "4.3.3"
 MAX_THUMBS = 200
 
 # ----------------------------- Tips do Menu de Configurações -----------------------------
@@ -368,22 +368,22 @@ class TelegramBot:
         """Formata mensagem amigável de início do sistema."""
         return (
             f"✅ SISTEMA INICIADO\n"
-            f"{'━' * 24}\n"
+            f"{'━' * 12}\n"
             f"🎥 Câmeras ativas: {cameras_ativas}\n"
             f"🚀 Status: Monitorando\n"
             f"v{versao}\n"
-            f"{'━' * 24}"
+            f"{'━' * 12}"
         )
 
     def formatar_msg_encerramento(self, total_deteccoes: int, versao: str) -> str:
         """Formata mensagem amigável de encerramento do sistema."""
         return (
             f"⏹️ SISTEMA ENCERRADO\n"
-            f"{'━' * 24}\n"
+            f"{'━' * 12}\n"
             f"👤 Detecções registradas: {total_deteccoes}\n"
             f"✓ Monitoramento finalizado\n"
             f"v{versao}\n"
-            f"{'━' * 24}"
+            f"{'━' * 12}"
         )
 
 
@@ -708,18 +708,18 @@ class RTSPObjectDetector:
             # Construir caption formatado
             caption = (
                 f"🚨 ALERTA DE DETECÇÃO\n"
-                f"{'━' * 24}\n"
+                f"{'━' * 12}\n"
                 f"📹 Câmera {self.cam_id}\n"
                 f"⏰ {timestamp_formatted}\n"
                 f"👤 {person_count} pessoa{'s' if person_count != 1 else ''} detectada{'s' if person_count != 1 else ''}\n"
                 f"📊 Confiança: {conf_pct:.1f}%\n"
-                f"{'━' * 24}\n"
+                f"{'━' * 12}\n"
                 f"📡 Qualidade do Stream:\n"
                 f"  • FPS: {perf.get('fps', 'N/A')}\n"
                 f"  • Taxa: {real_bitrate:.2f} Mbps\n"
                 f"  • Latência: {perf.get('latency', 'N/A')}ms\n"
                 f"  • Protocolo: {perf.get('protocol', 'UDP')}\n"
-                f"{'━' * 24}\n"
+                f"{'━' * 12}\n"
                 f"🔑 Evento: {event_uid[:8]}... | Shot: {shot_idx}\n"
                 f"v{APP_VERSION}"
             )
