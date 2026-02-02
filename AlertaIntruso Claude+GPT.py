@@ -4,7 +4,7 @@ ALERTAINTRUSO — ALARME INTELIGENTE POR VISÃO COMPUTACIONAL (RTSP • YOLO •
 ================================================================================
 Arquivo:        AlertaIntruso Claude+GPT.py
 Projeto:        Sistema de Alarme Inteligente por Visão Computacional
-Versão:         4.3.8
+Versão:         4.3.9
 Data:           02/02/2026
 Autor:          Fabio Bettio
 Licença:        Uso educacional / experimental
@@ -23,7 +23,7 @@ de movimento.
 Changelog completo
 ================================================================================
 
-v4.2.4 (02/02/2026) [UI POLISH] (linhas: 0) (base v4.3.7)
+v4.2.4 (02/02/2026) [UI POLISH] (linhas: 0) (base v4.3.8)
     - NOVO: Spinner animado de loading durante conexão/boot das câmeras
     - NOVO: Indicadores de status descritivos (Iniciando, Conectando, Sem sinal)
     - NOVO: Logo ⊘ para câmeras desativadas na configuração
@@ -152,7 +152,7 @@ def set_ffmpeg_capture_options(transport: str = "udp") -> None:
 
 set_ffmpeg_capture_options("udp")
 
-APP_VERSION = "4.3.8"
+APP_VERSION = "4.3.9"
 MAX_THUMBS = 200
 
 # ----------------------------- Tips do Menu de Configurações -----------------------------
@@ -722,7 +722,7 @@ class RTSPObjectDetector:
     def _person_present(self, cids) -> bool:
         return 0 in cids  # COCO: person=0
 
-    def _save_and_notify(self, frame_bgr_with_boxes, event_uid: str, shot_idx: int, person_count: int, conf_avg: float):
+    def _save_and_notify(self, frame_bgr_with_boxes, event_uid: str, shot_idx: int, person_count: int, conf_avg: float, detected_classes=None):
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         safe_uid = (event_uid or "evt").replace(":", "-").replace("/", "-")
         filename = f"{ts}_CAM{self.cam_id}_EVT{safe_uid}_S{shot_idx}.jpg"
@@ -760,13 +760,19 @@ class RTSPObjectDetector:
             latency = perf.get('latency', 0)
             latency_str = f"{latency:.1f}" if isinstance(latency, (int, float)) else "N/A"
             
+            # Determinar texto da detecção
+            if detected_classes:
+                detection_text = ", ".join(detected_classes)
+            else:
+                detection_text = "pessoa"
+            
             # Construir caption formatado (reduzido)
             caption = (
                 f"🚨 ALERTA DE DETECÇÃO\n"
                 f"{'━' * 12}\n"
                 f"📹 Câmera {self.cam_id}\n"
                 f"⏰ {timestamp_formatted}\n"
-                f"👤 {person_count} pessoa{'s' if person_count != 1 else ''}\n"
+                f"🔍 Detectado: {detection_text}\n"
                 f"📊 Confiança: {conf_pct:.1f}%\n"
                 f"📡 FPS: {fps_str} | Latência: {latency_str}ms\n"
                 f"v{APP_VERSION}"
@@ -917,22 +923,6 @@ class RTSPObjectDetector:
                 process_end = time.time()
                 self._latency_samples.append(process_end - process_start)
 
-                # Log "movimento sem pessoa" (throttle via monotonic)
-                if boxes and (not self._person_present(cids)):
-                    if (now_mono - self._last_nonperson_log_mono) > 5.0:
-                        self._last_nonperson_log_mono = now_mono
-                        conf_avg = (sum(confs) / len(confs)) if confs else 0.0
-                        self.log.log(
-                            "INFO",
-                            "MOVIMENTO SEM PESSOA | "
-                            f"boxes={len(boxes)} | "
-                            f"conf_avg={conf_avg:.2f} | "
-                            f"classes_detectadas={set(cids)} | "
-                            f"conf_th={self.conf_th:.2f} | nms_th={self.nms_th:.2f} | "
-                            f"cooldown={self.cooldown_s:.2f}s | v{APP_VERSION}",
-                            self.cam_id
-                        )
-
                 # Disparo de evento (monotonic)
                 if boxes and self._person_present(cids):
                     if (now_mono - self._last_event_time) >= self.cooldown_s and self._pending_shots <= 0:
@@ -966,8 +956,14 @@ class RTSPObjectDetector:
                             person_count = sum(1 for cid in cids if cid == 0)
                             conf_avg = (sum(confs) / len(confs)) if confs else 0.0
                             shot_idx = (int(self.photos_per_event) - int(self._pending_shots) + 1)
+                            
+                            # Coletar nomes das classes detectadas
+                            detected_class_names = []
+                            for cid in set(cids):
+                                if self.classes and cid < len(self.classes):
+                                    detected_class_names.append(self.classes[cid])
 
-                            self._save_and_notify(frame_draw, self._event_uid, shot_idx, person_count, conf_avg)
+                            self._save_and_notify(frame_draw, self._event_uid, shot_idx, person_count, conf_avg, detected_class_names)
 
                             self._pending_shots -= 1
                             self._last_shot_time = now_mono
