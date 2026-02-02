@@ -302,6 +302,8 @@ class RTSPObjectDetector:
         self._latency_samples: List[float] = []
         self._ping_ms = 0.0
         self._last_ping_time = 0.0
+        self._last_est_frame_size = 0
+        self._bitrate_sample_every = 3
 
         # Config runtime
         self.cooldown_s = 2.0
@@ -668,10 +670,11 @@ class RTSPObjectDetector:
                 # Coletar métricas de rede
                 self._total_frames_received += 1
                 self._frame_timestamps.append(now_wall)
-                if hasattr(frame, 'nbytes'):
-                    frame_size = frame.nbytes
+                if self._bitrate_sample_every > 0 and (self._total_frames_received % self._bitrate_sample_every) == 0:
+                    frame_size = self._estimate_frame_size_bytes(frame)
+                    self._last_est_frame_size = frame_size
                 else:
-                    frame_size = frame.shape[0] * frame.shape[1] * frame.shape[2] if len(frame.shape) == 3 else frame.shape[0] * frame.shape[1]
+                    frame_size = self._last_est_frame_size or self._estimate_frame_size_bytes(frame)
                 self._frame_sizes.append(frame_size)
                 self._bytes_received += frame_size
 
@@ -783,7 +786,8 @@ class RTSPObjectDetector:
                     gpu_info = "CUDA" if cv2.cuda.getCudaEnabledDeviceCount() > 0 else "CPU"
                     
                     # Calcular métricas de rede
-                    bitrate_mbps = self._calculate_bitrate()
+                    bitrate_mbs = self._calculate_bitrate()
+                    bitrate_mbps = bitrate_mbs * 8.0
                     latency_ms = self._calculate_latency()
                     jitter_ms = self._calculate_jitter()
                     frame_loss = self._calculate_frame_loss()
@@ -805,7 +809,7 @@ class RTSPObjectDetector:
                         "INFO",
                         f"PERFORMANCE | Frames: {frame_count} | FPS: {fps:.2f} | CPU: {cpu_percent:.1f}% | "
                         f"RAM: {ram_percent:.1f}% | InfTime: {avg_inf:.3f}s | GPU: {gpu_info} | "
-                        f"Bitrate: {bitrate_mbps:.2f}Mbps | Latency: {latency_ms:.1f}ms | Jitter: {jitter_ms:.1f}ms | "
+                        f"Taxa: {bitrate_mbps:.2f}Mbps ({bitrate_mbs:.2f}MB/s) | Latency: {latency_ms:.1f}ms | Jitter: {jitter_ms:.1f}ms | "
                         f"Ping: {self._ping_ms:.0f}ms | Loss: {frame_loss:.1f}% | Proto: {protocol} | v{APP_VERSION}",
                         self.cam_id
                     )
@@ -819,7 +823,7 @@ class RTSPObjectDetector:
                 pass
 
     def _calculate_bitrate(self) -> float:
-        """Calcula bitrate em Mbps baseado nos últimos frames"""
+        """Calcula taxa de transferência em MB/s baseado nos últimos frames"""
         try:
             if len(self._frame_sizes) < 2:
                 return 0.0
@@ -827,10 +831,26 @@ class RTSPObjectDetector:
             time_span = self._frame_timestamps[-1] - self._frame_timestamps[0]
             if time_span <= 0:
                 return 0.0
-            bits_per_sec = (total_bytes * 8) / time_span
-            return bits_per_sec / 1_000_000  # Converter para Mbps
+            bytes_per_sec = total_bytes / time_span
+            return bytes_per_sec / 1_000_000  # Converter para MB/s
         except Exception:
             return 0.0
+
+    def _estimate_frame_size_bytes(self, frame) -> int:
+        """Estima tamanho do frame comprimido (JPEG) para aproximar taxa real"""
+        try:
+            encode_params = [int(cv2.IMWRITE_JPEG_QUALITY), 70]
+            ok, buf = cv2.imencode(".jpg", frame, encode_params)
+            if ok:
+                return int(len(buf))
+        except Exception:
+            pass
+        try:
+            if hasattr(frame, "nbytes"):
+                return int(frame.nbytes)
+        except Exception:
+            pass
+        return 0
 
     def _calculate_latency(self) -> float:
         """Calcula latência estimada em ms (tempo entre captura e processamento)"""
@@ -1407,6 +1427,8 @@ class InterfaceGrafica:
                 self._show_tooltip_on_hover(widget, tip_text)
             else:
                 self._hide_tooltip(widget)
+        if not show_tips:
+            self._hide_perf_header_tooltip()
 
     def _show_tooltip_on_hover(self, widget, text):
         """Mostra tooltip ao passar mouse sobre widget"""
@@ -1465,11 +1487,11 @@ class InterfaceGrafica:
         ttk.Button(self.frame_logs, text="Limpar", command=lambda: self.text_logs.delete("1.0", tk.END)).pack(pady=4)
 
     def _build_performance_tab(self):
-        columns = ("Câmera", "FPS", "Bitrate", "Latência", "Jitter", "Ping", "Perda", "Proto", "CPU", "RAM")
+        columns = ("Câmera", "FPS", "Tx (Mbps/MB/s)", "Latência (ms)", "Jitter (ms)", "Ping (ms)", "Perda (%)", "Proto", "CPU (%)", "RAM (%)")
         self.perf_tree = ttk.Treeview(self.frame_performance, columns=columns, show="headings", height=6)
 
-        col_widths = {"Câmera": 80, "FPS": 60, "Bitrate": 80, "Latência": 70, "Jitter": 60, 
-                      "Ping": 60, "Perda": 60, "Proto": 50, "CPU": 60, "RAM": 60}
+        col_widths = {"Câmera": 80, "FPS": 60, "Tx (Mbps/MB/s)": 120, "Latência (ms)": 90, "Jitter (ms)": 80,
+                      "Ping (ms)": 70, "Perda (%)": 70, "Proto": 60, "CPU (%)": 60, "RAM (%)": 60}
         
         for col in columns:
             self.perf_tree.heading(col, text=col)
@@ -1484,6 +1506,88 @@ class InterfaceGrafica:
         for cam in range(1, 5):
             self.perf_tree.insert("", "end", iid=f"cam{cam}", values=(f"Câmera {cam}", "--", "--", "--", "--", "--", "--", "--", "--", "--"))
         self.perf_tree.insert("", "end", iid="system", values=("Sistema", "--", "--", "--", "--", "--", "--", "--", "--", "--"))
+
+        self._setup_performance_header_tooltips()
+
+    def _setup_performance_header_tooltips(self):
+        self.perf_header_tips = {
+            "Câmera": "Identificação da câmera.",
+            "FPS": "Frames por segundo (taxa de quadros recebidos).",
+            "Tx (Mbps/MB/s)": "Taxa de transferência estimada do stream em Mbps e MB/s (estimativa por compressão JPEG dos frames).",
+            "Latência (ms)": "Tempo de processamento do frame (captura → detecção).",
+            "Jitter (ms)": "Variação do intervalo entre frames (estabilidade do stream).",
+            "Ping (ms)": "Tempo de resposta de rede até o host da câmera.",
+            "Perda (%)": "Percentual estimado de perda de frames.",
+            "Proto": "Protocolo RTSP em uso (UDP/TCP).",
+            "CPU (%)": "Uso de CPU do processo.",
+            "RAM (%)": "Uso de memória do processo."
+        }
+        self._perf_header_tooltip = None
+        self._perf_header_current = None
+        self.perf_tree.bind("<Motion>", self._on_perf_header_motion)
+        self.perf_tree.bind("<Leave>", self._on_perf_header_leave)
+
+    def _on_perf_header_motion(self, event):
+        if not getattr(self, "var_show_tips", None) or not self.var_show_tips.get():
+            self._hide_perf_header_tooltip()
+            return
+
+        region = self.perf_tree.identify_region(event.x, event.y)
+        if region != "heading":
+            self._hide_perf_header_tooltip()
+            return
+
+        col_id = self.perf_tree.identify_column(event.x)  # ex: #1
+        try:
+            col_index = int(col_id.replace("#", "")) - 1
+        except Exception:
+            self._hide_perf_header_tooltip()
+            return
+
+        columns = list(self.perf_tree["columns"])
+        if col_index < 0 or col_index >= len(columns):
+            self._hide_perf_header_tooltip()
+            return
+
+        col_name = columns[col_index]
+        tip = self.perf_header_tips.get(col_name)
+        if not tip:
+            self._hide_perf_header_tooltip()
+            return
+
+        if self._perf_header_current != col_name:
+            self._perf_header_current = col_name
+            self._show_perf_header_tooltip(event.x_root + 10, event.y_root + 10, tip)
+
+    def _on_perf_header_leave(self, event):
+        self._hide_perf_header_tooltip()
+
+    def _show_perf_header_tooltip(self, x, y, text):
+        self._hide_perf_header_tooltip()
+        tooltip = tk.Toplevel()
+        tooltip.wm_overrideredirect(True)
+        tooltip.wm_geometry(f"+{x}+{y}")
+        label = tk.Label(
+            tooltip,
+            text=text,
+            background="#ffffe0",
+            relief="solid",
+            borderwidth=1,
+            wraplength=300,
+            justify="left",
+            font=("Arial", 9)
+        )
+        label.pack()
+        self._perf_header_tooltip = tooltip
+
+    def _hide_perf_header_tooltip(self):
+        if self._perf_header_tooltip is not None:
+            try:
+                self._perf_header_tooltip.destroy()
+            except Exception:
+                pass
+        self._perf_header_tooltip = None
+        self._perf_header_current = None
 
     def _update_performance(self):
         try:
@@ -1504,7 +1608,7 @@ class InterfaceGrafica:
                     protocol = perf.get("protocol", "?")
 
                     fps_text = f"{fps:.1f}" + (" ⚠" if fps < 10 else "")
-                    bitrate_text = f"{bitrate:.1f}Mb" if bitrate > 0 else "--"
+                    bitrate_text = f"{bitrate * 8:.2f}Mbps ({bitrate:.2f}MB/s)" if bitrate > 0 else "--"
                     latency_text = f"{latency:.0f}ms" + (" ⚠" if latency > 100 else "") if latency > 0 else "--"
                     jitter_text = f"{jitter:.0f}ms" + (" ⚠" if jitter > 30 else "") if jitter > 0 else "--"
                     ping_text = f"{ping:.0f}ms" + (" ⚠" if ping > 100 else "") if ping > 0 else "--"
