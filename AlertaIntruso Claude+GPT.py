@@ -1469,10 +1469,6 @@ class InterfaceGrafica:
         bottom_frame = ttk.Frame(self.frame_config)
         bottom_frame.pack(side="bottom", fill="x", padx=6, pady=6)
 
-        # Padding no wrap
-        wrap.pack_propagate(False)
-        ttk.Label(wrap).pack()  # Espaço superior
-
         # ========== CHECKBOX DE TIPS ==========
         tips_frame = ttk.Frame(wrap)
         tips_frame.pack(fill="x", pady=(0, 15), padx=5)
