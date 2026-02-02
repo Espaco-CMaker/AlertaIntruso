@@ -2152,8 +2152,15 @@ class InterfaceGrafica:
             g["last_dt"] = dt
             return g
 
-        row = len(self.thumb_groups_order)
-        self.thumb_groups_order.append(uid)
+        # Inserir novo grupo no INÍCIO (fotos mais novas primeiro)
+        row = 0
+        self.thumb_groups_order.insert(0, uid)
+        
+        # Atualizar row de todos os grupos existentes (deslocar para baixo)
+        for other_uid in self.thumb_groups_order[1:]:
+            g_existing = self.thumb_groups_by_uid[other_uid]
+            g_existing["row"] += 1
+            g_existing["thumbs_frame"].master.grid(row=g_existing["row"], column=0, sticky="w", padx=8, pady=10)
 
         g_frame = ttk.Frame(self.photos_wrap)
         g_frame.grid(row=row, column=0, sticky="w", padx=8, pady=10)
