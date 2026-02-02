@@ -4,7 +4,7 @@ ALERTAINTRUSO — ALARME INTELIGENTE POR VISÃO COMPUTACIONAL (RTSP • YOLO •
 ================================================================================
 Arquivo:        AlertaIntruso Claude+GPT.py
 Projeto:        Sistema de Alarme Inteligente por Visão Computacional
-Versão:         4.3.4
+Versão:         4.3.5
 Data:           02/02/2026
 Autor:          Fabio Bettio
 Licença:        Uso educacional / experimental
@@ -23,7 +23,7 @@ de movimento.
 Changelog completo
 ================================================================================
 
-v4.2.4 (02/02/2026) [UI POLISH] (linhas: 0) (base v4.3.3)
+v4.2.4 (02/02/2026) [UI POLISH] (linhas: 0) (base v4.3.4)
     - NOVO: Spinner animado de loading durante conexão/boot das câmeras
     - NOVO: Indicadores de status descritivos (Iniciando, Conectando, Sem sinal)
     - NOVO: Logo ⊘ para câmeras desativadas na configuração
@@ -152,7 +152,7 @@ def set_ffmpeg_capture_options(transport: str = "udp") -> None:
 
 set_ffmpeg_capture_options("udp")
 
-APP_VERSION = "4.3.4"
+APP_VERSION = "4.3.5"
 MAX_THUMBS = 200
 
 # ----------------------------- Tips do Menu de Configurações -----------------------------
@@ -1934,6 +1934,17 @@ class InterfaceGrafica:
         lbl.imgtk = imgtk
         lbl.configure(image=imgtk)
 
+    def _clear_cam_frame(self, cam_id: int):
+        """Remove imagem da câmera, deixando apenas fundo preto"""
+        lbl = self.cam_labels.get(cam_id)
+        if not lbl:
+            return
+        try:
+            lbl.configure(image="")
+            lbl.imgtk = None
+        except Exception:
+            pass
+
     def _hide_spinner(self, cam_id: int):
         """Esconde spinner quando câmera recebe frames"""
         if cam_id in self.cam_spinners:
@@ -1965,8 +1976,9 @@ class InterfaceGrafica:
             disabled_label = self.cam_disabled_labels[cam_id]
             
             if not is_enabled:
-                # Câmera desativada: mostrar logo de desativação
+                # Câmera desativada: limpar imagem e mostrar logo de desativação
                 try:
+                    self._clear_cam_frame(cam_id)
                     spinner.config(text="")
                     status_label.config(text="")
                     disabled_label.config(text="⊘")  # Símbolo de desativado
@@ -1984,7 +1996,9 @@ class InterfaceGrafica:
             status = getattr(det, "status", "offline")
 
             if status in ("offline", "online", "frozen"):
+                # Câmera desconectada: limpar imagem e mostrar spinner + texto
                 try:
+                    self._clear_cam_frame(cam_id)
                     idx = self.cam_spinner_index.get(cam_id, 0)
                     frames = self.cam_spinner_texts.get(cam_id, [])
                     if frames:
