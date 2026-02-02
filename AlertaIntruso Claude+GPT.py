@@ -533,8 +533,8 @@ class RTSPObjectDetector:
         # Robustez RTSP (monotonic)
         self._bad_reads = 0
         self._last_reconnect_try_mono = 0.0
-        self._reconnect_backoff_s = 2.0
-        self._max_backoff_s = 20.0
+        self._reconnect_backoff_s = 5.0  # Aumentado: esperar 5s antes de tentar reconectar
+        self._max_backoff_s = 30.0  # Aumentado: máximo de 30s entre tentativas
 
         # Throttle de logs (monotonic)
         self._last_nonperson_log_mono = 0.0
@@ -870,7 +870,7 @@ class RTSPObjectDetector:
                         if ok:
                             self.log.log("INFO", "Reconectou após falha de frame.", self.cam_id)
                             self._bad_reads = 0
-                            self._reconnect_backoff_s = 2.0
+                            self._reconnect_backoff_s = 5.0  # Reset para 5s
                         else:
                             self._reconnect_backoff_s = min(self._max_backoff_s, self._reconnect_backoff_s * 1.5)
 
@@ -879,7 +879,7 @@ class RTSPObjectDetector:
 
                 # frame OK
                 self._bad_reads = 0
-                self._reconnect_backoff_s = 2.0
+                self._reconnect_backoff_s = 5.0  # Reset para 5s
 
                 now_mono = time.monotonic()
                 now_wall = time.time()
