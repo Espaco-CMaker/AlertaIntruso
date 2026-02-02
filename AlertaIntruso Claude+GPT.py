@@ -4,7 +4,7 @@ ALERTAINTRUSO — ALARME INTELIGENTE POR VISÃO COMPUTACIONAL (RTSP • YOLO •
 ================================================================================
 Arquivo:        AlertaIntruso Claude+GPT.py
 Projeto:        Sistema de Alarme Inteligente por Visão Computacional
-Versão:         4.2.4 (base 4.2.3)
+Versão:         4.3.0
 Data:           02/02/2026
 Autor:          Fabio Bettio
 Licença:        Uso educacional / experimental
@@ -23,7 +23,7 @@ de movimento.
 Changelog completo
 ================================================================================
 
-v4.2.4 (02/02/2026) [UI POLISH] (linhas: 0) (base v4.2.3)
+v4.2.4 (02/02/2026) [UI POLISH] (linhas: 0) (base v4.3.0)
     - NOVO: Spinner animado de loading durante conexão/boot das câmeras
     - NOVO: Indicadores de status descritivos (Iniciando, Conectando, Sem sinal)
     - NOVO: Logo ⊘ para câmeras desativadas na configuração
@@ -126,6 +126,12 @@ except ImportError:
     psutil = None
     PSUTIL_AVAILABLE = False
 
+try:
+    from scapy.all import sniff, IP, UDP  # type: ignore
+    SCAPY_AVAILABLE = True
+except ImportError:
+    SCAPY_AVAILABLE = False
+
 import tkinter as tk
 from tkinter import ttk, scrolledtext, messagebox
 from PIL import Image, ImageTk
@@ -146,7 +152,7 @@ def set_ffmpeg_capture_options(transport: str = "udp") -> None:
 
 set_ffmpeg_capture_options("udp")
 
-APP_VERSION = "4.2.4"
+APP_VERSION = "4.3.0"
 MAX_THUMBS = 200
 
 # ----------------------------- Tips do Menu de Configurações -----------------------------
@@ -173,6 +179,104 @@ CONFIGURATION_TIPS = {
     "alert_mode": "Tipo de alerta: 'all' = eventos de sistema + fotos, 'detections' = somente fotos, 'none' = desativado",
     "rtsp_transport": "Transporte RTSP: 'udp' (padrão, menor latência) ou 'tcp' (mais estável em redes instáveis)",
 }
+
+
+# ----------------------------- Network Monitor (RTP) -----------------------------
+class NetworkMonitor:
+    """Monitora tráfego RTP para calcular taxa real de transferência"""
+    def __init__(self):
+        self.cam_bitrates: Dict[int, float] = {cam_id: 0.0 for cam_id in range(1, 5)}
+        self.cam_packet_counts: Dict[int, int] = {cam_id: 0 for cam_id in range(1, 5)}
+        self.cam_last_bytes: Dict[int, int] = {cam_id: 0 for cam_id in range(1, 5)}
+        self.cam_last_time: Dict[int, float] = {cam_id: 0.0 for cam_id in range(1, 5)}
+        self.running = False
+        self.rtsp_urls: Dict[int, str] = {}
+        self.rtsp_ports: Dict[int, int] = {}
+        self.sniffer_thread = None
+
+    def start(self, rtsp_urls: Dict[int, str]):
+        """Inicia captura de pacotes RTP em thread separada"""
+        if not SCAPY_AVAILABLE:
+            return
+
+        self.rtsp_urls = rtsp_urls
+        # Extrair portas das URLs RTSP
+        import re
+        for cam_id, url in rtsp_urls.items():
+            match = re.search(r':(\d+)(?:/|$)', url)
+            self.rtsp_ports[cam_id] = int(match.group(1)) if match else 554
+
+        self.running = True
+        self.sniffer_thread = threading.Thread(target=self._packet_sniffer, daemon=True)
+        self.sniffer_thread.start()
+
+    def stop(self):
+        """Para captura de pacotes"""
+        self.running = False
+        if self.sniffer_thread:
+            try:
+                self.sniffer_thread.join(timeout=2)
+            except Exception:
+                pass
+
+    def _packet_sniffer(self):
+        """Captura pacotes UDP/RTP em segundo plano"""
+        if not SCAPY_AVAILABLE:
+            return
+
+        try:
+            def packet_callback(packet):
+                if not self.running:
+                    return
+
+                if not packet.haslayer(UDP):
+                    return
+
+                try:
+                    src_port = packet[UDP].sport
+                    dst_port = packet[UDP].dport
+                    payload_len = len(packet[UDP].payload) if packet[UDP].payload else 0
+
+                    # Associar pacotes aos IDs das câmeras por porta
+                    for cam_id, port_range in [(1, range(5000, 5010)), (2, range(5010, 5020)), 
+                                                (3, range(5020, 5030)), (4, range(5030, 5040))]:
+                        if dst_port in port_range or src_port in port_range:
+                            self.cam_last_bytes[cam_id] += payload_len
+                            self.cam_packet_counts[cam_id] += 1
+
+                except Exception:
+                    pass
+
+            sniff(prn=packet_callback, store=False, iface=None, filter="udp", timeout=60)
+        except Exception:
+            pass
+
+    def get_bitrate(self, cam_id: int) -> float:
+        """Retorna bitrate estimado em Mbps (baseado em pacotes capturados)"""
+        if cam_id not in self.cam_last_time:
+            return 0.0
+
+        now = time.time()
+        bytes_count = self.cam_last_bytes.get(cam_id, 0)
+        last_time = self.cam_last_time.get(cam_id, 0)
+
+        if last_time == 0:
+            self.cam_last_time[cam_id] = now
+            return 0.0
+
+        time_delta = now - last_time
+        if time_delta < 1.0:  # Atualizar a cada 1s
+            return self.cam_bitrates.get(cam_id, 0.0)
+
+        # Calcular Mbps
+        bits_per_sec = (bytes_count * 8) / time_delta
+        mbps = bits_per_sec / 1_000_000
+
+        self.cam_bitrates[cam_id] = mbps
+        self.cam_last_bytes[cam_id] = 0
+        self.cam_last_time[cam_id] = now
+
+        return mbps
 
 
 # ----------------------------- Log -----------------------------
@@ -983,6 +1087,9 @@ class InterfaceGrafica:
         self.threads: Dict[int, threading.Thread] = {}
         self.running = False
 
+        # Network Monitor (captura RTP para taxa real)
+        self.network_monitor = NetworkMonitor()
+
         # Watchdog (monotonic)
         self.watchdog_interval_ms = 2000
         self.watchdog_no_frame_s = 20.0  # Aumentado de 12s para 20s (rede instável)
@@ -1630,15 +1737,19 @@ class InterfaceGrafica:
                     fps = perf.get("fps", 0)
                     cpu = perf.get("cpu", 0)
                     ram = perf.get("ram", 0)
-                    bitrate = perf.get("bitrate", 0)
                     latency = perf.get("latency", 0)
                     jitter = perf.get("jitter", 0)
                     ping = perf.get("ping", 0)
                     frame_loss = perf.get("frame_loss", 0)
                     protocol = perf.get("protocol", "?")
 
+                    # Usar bitrate real do Network Monitor
+                    bitrate_real = self.network_monitor.get_bitrate(cam)
+                    bitrate_mbs = bitrate_real / 1_000_000 if bitrate_real > 0 else 0.0
+                    bitrate_mbps = bitrate_mbs * 8.0
+
                     fps_text = f"{fps:.1f}" + (" ⚠" if fps < 10 else "")
-                    bitrate_text = f"{bitrate * 8:.2f}Mbps ({bitrate:.2f}MB/s)" if bitrate > 0 else "--"
+                    bitrate_text = f"{bitrate_mbps:.2f}Mbps ({bitrate_mbs:.2f}MB/s)" if bitrate_real > 0 else "--"
                     latency_text = f"{latency:.0f}ms" + (" ⚠" if latency > 100 else "") if latency > 0 else "--"
                     jitter_text = f"{jitter:.0f}ms" + (" ⚠" if jitter > 30 else "") if jitter > 0 else "--"
                     ping_text = f"{ping:.0f}ms" + (" ⚠" if ping > 100 else "") if ping > 0 else "--"
@@ -1672,7 +1783,7 @@ class InterfaceGrafica:
     def _build_about_tab(self):
         ttk.Label(self.frame_about, text=f"Versão: {APP_VERSION}", font=("Arial", 12, "bold")).pack(pady=10)
         ttk.Label(self.frame_about, text="Autor: Fabio Bettio", font=("Arial", 10)).pack(pady=5)
-        ttk.Label(self.frame_about, text="Data: 06/01/2026", font=("Arial", 10)).pack(pady=5)
+        ttk.Label(self.frame_about, text="Data:           02/02/2026", font=("Arial", 10)).pack(pady=5)
         ttk.Label(self.frame_about, text="Licença: Uso educacional/experimental", font=("Arial", 10)).pack(pady=5)
 
     def _load_logs_tail(self):
@@ -2023,6 +2134,11 @@ class InterfaceGrafica:
             4: self.config["CAM4"].get("rtsp_url", "").strip(),
         }
 
+        # Iniciar Network Monitor para captura de taxa real
+        enabled_urls = {cam_id: url for cam_id, url in urls.items() if url}
+        self.network_monitor.start(enabled_urls)
+        self.log.log("INFO", "Network Monitor iniciado para medição de taxa real")
+
         enabled_cams = self._enabled_cams()
 
         for cam_id in (1, 2, 3, 4):
@@ -2058,6 +2174,13 @@ class InterfaceGrafica:
                 total_detections += int(getattr(det, "detections_total", 0))
             except Exception:
                 pass
+
+        # Parar Network Monitor
+        try:
+            self.network_monitor.stop()
+            self.log.log("INFO", "Network Monitor parado")
+        except Exception:
+            pass
 
         for det in list(self.detectors.values()):
             try:
