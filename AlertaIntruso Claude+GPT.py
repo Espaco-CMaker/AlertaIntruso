@@ -4,7 +4,7 @@ ALERTAINTRUSO — ALARME INTELIGENTE POR VISÃO COMPUTACIONAL (RTSP • YOLO •
 ================================================================================
 Arquivo:        AlertaIntruso Claude+GPT.py
 Projeto:        Sistema de Alarme Inteligente por Visão Computacional
-Versão:         4.3.5
+Versão:         4.3.6
 Data:           02/02/2026
 Autor:          Fabio Bettio
 Licença:        Uso educacional / experimental
@@ -23,7 +23,7 @@ de movimento.
 Changelog completo
 ================================================================================
 
-v4.2.4 (02/02/2026) [UI POLISH] (linhas: 0) (base v4.3.4)
+v4.2.4 (02/02/2026) [UI POLISH] (linhas: 0) (base v4.3.5)
     - NOVO: Spinner animado de loading durante conexão/boot das câmeras
     - NOVO: Indicadores de status descritivos (Iniciando, Conectando, Sem sinal)
     - NOVO: Logo ⊘ para câmeras desativadas na configuração
@@ -134,7 +134,7 @@ except ImportError:
 
 import tkinter as tk
 from tkinter import ttk, scrolledtext, messagebox
-from PIL import Image, ImageTk
+from PIL import Image, ImageTk, ImageDraw
 
 def set_ffmpeg_capture_options(transport: str = "udp") -> None:
     mode = (transport or "udp").strip().lower()
@@ -152,7 +152,7 @@ def set_ffmpeg_capture_options(transport: str = "udp") -> None:
 
 set_ffmpeg_capture_options("udp")
 
-APP_VERSION = "4.3.5"
+APP_VERSION = "4.3.6"
 MAX_THUMBS = 200
 
 # ----------------------------- Tips do Menu de Configurações -----------------------------
@@ -407,6 +407,8 @@ class RTSPObjectDetector:
         self.rtsp_url = (rtsp_url or "").strip()
         self.log = log
         self.telegram = telegram
+
+        self.network_monitor = None
 
         self.models_dir = Path(models_dir)
         self.foto_dir = Path(foto_dir)
@@ -1584,6 +1586,9 @@ class InterfaceGrafica:
         self._add_tooltip_to_widget(lbl_alert, CONFIGURATION_TIPS["alert_mode"])
         self._add_tooltip_to_widget(self.cb_alert, CONFIGURATION_TIPS["alert_mode"])
 
+        self.btn_test_telegram = ttk.Button(tg, text="Testar envio", command=self._send_telegram_test)
+        self.btn_test_telegram.grid(row=3, column=1, padx=6, pady=(6, 2), sticky="w")
+
         # ========== CONTROLES ==========
         ctrl = ttk.Frame(wrap)
         ctrl.pack(fill="x", pady=10)
@@ -2235,6 +2240,7 @@ class InterfaceGrafica:
                 continue
 
             det = RTSPObjectDetector(cam_id, urls[cam_id], self.log, self.telegram)
+            det.network_monitor = self.network_monitor
             self._apply_detector_config(det)
 
             det.frame_callback = lambda cid, fr, q=self.frame_queue: q.put((cid, fr))
@@ -2338,6 +2344,7 @@ class InterfaceGrafica:
 
         try:
             new_det = RTSPObjectDetector(cam_id, url, self.log, self.telegram)
+            new_det.network_monitor = self.network_monitor
             self._apply_detector_config(new_det)
 
             new_det.frame_callback = lambda cid, fr, q=self.frame_queue: q.put((cid, fr))
@@ -2378,6 +2385,57 @@ class InterfaceGrafica:
         except Exception as e:
             self.log.log("ERROR", f"Falha ao recarregar config: {e}")
             messagebox.showerror("Erro", str(e))
+
+    def _send_telegram_test(self):
+        token = self.e_token.get().strip()
+        chat_id = self.e_chat.get().strip()
+
+        if not token or not chat_id:
+            messagebox.showwarning("Telegram", "Informe Bot Token e Chat ID para testar o envio.")
+            return
+
+        tg = TelegramBot(token, chat_id, self.log)
+        if not tg.enabled:
+            messagebox.showwarning("Telegram", "Bot Token ou Chat ID inválidos.")
+            return
+
+        try:
+            ts = datetime.now()
+            ts_str = ts.strftime("%d/%m/%Y %H:%M:%S")
+            file_ts = ts.strftime("%Y%m%d_%H%M%S")
+
+            img = Image.new("RGB", (640, 360), (0, 0, 0))
+            draw = ImageDraw.Draw(img)
+            draw.text((20, 20), "ALERTA TESTE", fill=(255, 255, 255))
+            draw.text((20, 60), f"{ts_str}", fill=(200, 200, 200))
+            draw.text((20, 100), "Simulação de detecção", fill=(200, 200, 200))
+
+            foto_dir = Path("fotos")
+            foto_dir.mkdir(exist_ok=True)
+            foto_path = foto_dir / f"teste_telegram_{file_ts}.jpg"
+            img.save(foto_path, "JPEG", quality=85)
+
+            caption = (
+                "🧪 TESTE DE DETECÇÃO\n"
+                f"{'━' * 12}\n"
+                f"📹 Câmera: TESTE\n"
+                f"⏰ {ts_str}\n"
+                f"👤 1 pessoa detectada\n"
+                f"📊 Confiança: 99.0%\n"
+                f"{'━' * 12}\n"
+                f"v{APP_VERSION}"
+            )
+
+            ok = tg.enviar_foto(str(foto_path), caption)
+            if ok:
+                self.log.log("INFO", "Teste Telegram enviado com sucesso.")
+                messagebox.showinfo("Telegram", "Teste enviado com sucesso!")
+            else:
+                self.log.log("WARN", "Falha ao enviar teste Telegram.")
+                messagebox.showwarning("Telegram", "Falha ao enviar teste.")
+        except Exception as e:
+            self.log.log("ERROR", f"Erro no teste do Telegram: {e}")
+            messagebox.showerror("Telegram", f"Erro ao enviar teste: {e}")
 
     # ---------------- WATCHDOG ----------------
     def _supervise_cameras(self):
