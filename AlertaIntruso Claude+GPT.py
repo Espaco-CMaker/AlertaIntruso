@@ -4,7 +4,7 @@ ALERTAINTRUSO — ALARME INTELIGENTE POR VISÃO COMPUTACIONAL (RTSP • YOLO •
 ================================================================================
 Arquivo:        AlertaIntruso Claude+GPT.py
 Projeto:        Sistema de Alarme Inteligente por Visão Computacional
-Versão:         4.3.6
+Versão:         4.3.7
 Data:           02/02/2026
 Autor:          Fabio Bettio
 Licença:        Uso educacional / experimental
@@ -23,7 +23,7 @@ de movimento.
 Changelog completo
 ================================================================================
 
-v4.2.4 (02/02/2026) [UI POLISH] (linhas: 0) (base v4.3.5)
+v4.2.4 (02/02/2026) [UI POLISH] (linhas: 0) (base v4.3.6)
     - NOVO: Spinner animado de loading durante conexão/boot das câmeras
     - NOVO: Indicadores de status descritivos (Iniciando, Conectando, Sem sinal)
     - NOVO: Logo ⊘ para câmeras desativadas na configuração
@@ -152,7 +152,7 @@ def set_ffmpeg_capture_options(transport: str = "udp") -> None:
 
 set_ffmpeg_capture_options("udp")
 
-APP_VERSION = "4.3.6"
+APP_VERSION = "4.3.7"
 MAX_THUMBS = 200
 
 # ----------------------------- Tips do Menu de Configurações -----------------------------
@@ -286,9 +286,32 @@ class LogManager:
         self.max_size = max_size_mb * 1024 * 1024
         self.callbacks: List[Callable[[str], None]] = []
         self._lock = threading.Lock()
+        self.telegram = None
+        self._sending_telegram = False
 
     def add_callback(self, cb: Callable[[str], None]) -> None:
         self.callbacks.append(cb)
+
+    def set_telegram(self, telegram) -> None:
+        self.telegram = telegram
+
+    def _is_critical_connection_issue(self, level: str, msg: str) -> bool:
+        if level not in ("WARN", "ERROR"):
+            return False
+        text = (msg or "").lower()
+        patterns = [
+            "falha rtsp",
+            "sem frame",
+            "sem sinal",
+            "desconect",
+            "rtsp vazio",
+            "hard restart",
+            "soft reconnect",
+            "watchdog: sem frame",
+            "falha ao recriar câmera",
+            "erro ao conectar",
+        ]
+        return any(p in text for p in patterns)
 
     def _rotate_if_needed(self) -> None:
         if not self.log_file.exists():
@@ -306,6 +329,9 @@ class LogManager:
                 pass
 
     def log(self, level: str, msg: str, cam: Optional[int] = None) -> None:
+        is_critical = self._is_critical_connection_issue(level, msg)
+        if is_critical and level == "WARN":
+            level = "ERROR"
         ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         prefix = f"[{ts}] [{level}]"
         if cam is not None:
@@ -325,6 +351,26 @@ class LogManager:
                 cb(line)
             except Exception:
                 pass
+
+        if is_critical and self.telegram and getattr(self.telegram, "enabled", False):
+            if not self._sending_telegram and "Erro ao enviar mensagem Telegram" not in msg:
+                try:
+                    self._sending_telegram = True
+                    cam_text = f"📹 Câmera {cam}" if cam is not None else "📹 Câmera: N/D"
+                    caption = (
+                        "🚨 ALERTA CRÍTICO\n"
+                        f"{'━' * 12}\n"
+                        f"{cam_text}\n"
+                        f"⏰ {ts}\n"
+                        f"⚠ {msg}\n"
+                        f"{'━' * 12}\n"
+                        f"v{APP_VERSION}"
+                    )
+                    self.telegram.enviar_mensagem(caption)
+                except Exception:
+                    pass
+                finally:
+                    self._sending_telegram = False
 
 
 # ----------------------------- Telegram -----------------------------
@@ -1131,6 +1177,7 @@ class InterfaceGrafica:
         token = self.config["TELEGRAM"].get("bot_token", "")
         chat_id = self.config["TELEGRAM"].get("chat_id", "")
         self.telegram = TelegramBot(token, chat_id, self.log)
+        self.log.set_telegram(self.telegram)
 
         self.detectors: Dict[int, RTSPObjectDetector] = {}
         self.threads: Dict[int, threading.Thread] = {}
@@ -2211,6 +2258,7 @@ class InterfaceGrafica:
         token = self.config["TELEGRAM"].get("bot_token", "")
         chat_id = self.config["TELEGRAM"].get("chat_id", "")
         self.telegram = TelegramBot(token, chat_id, self.log)
+        self.log.set_telegram(self.telegram)
 
         self.stop_system(silent=True)
 
