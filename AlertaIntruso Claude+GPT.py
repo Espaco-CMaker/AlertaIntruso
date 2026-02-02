@@ -4,7 +4,7 @@ ALERTAINTRUSO — ALARME INTELIGENTE POR VISÃO COMPUTACIONAL (RTSP • YOLO •
 ================================================================================
 Arquivo:        AlertaIntruso Claude+GPT.py
 Projeto:        Sistema de Alarme Inteligente por Visão Computacional
-Versão:         4.3.7
+Versão:         4.3.8
 Data:           02/02/2026
 Autor:          Fabio Bettio
 Licença:        Uso educacional / experimental
@@ -23,7 +23,7 @@ de movimento.
 Changelog completo
 ================================================================================
 
-v4.2.4 (02/02/2026) [UI POLISH] (linhas: 0) (base v4.3.6)
+v4.2.4 (02/02/2026) [UI POLISH] (linhas: 0) (base v4.3.7)
     - NOVO: Spinner animado de loading durante conexão/boot das câmeras
     - NOVO: Indicadores de status descritivos (Iniciando, Conectando, Sem sinal)
     - NOVO: Logo ⊘ para câmeras desativadas na configuração
@@ -152,7 +152,7 @@ def set_ffmpeg_capture_options(transport: str = "udp") -> None:
 
 set_ffmpeg_capture_options("udp")
 
-APP_VERSION = "4.3.7"
+APP_VERSION = "4.3.8"
 MAX_THUMBS = 200
 
 # ----------------------------- Tips do Menu de Configurações -----------------------------
@@ -753,22 +753,22 @@ class RTSPObjectDetector:
             timestamp_formatted = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
             conf_pct = conf_avg * 100
             
-            # Construir caption formatado
+            # Formatar FPS e latência com 1 casa decimal
+            fps = perf.get('fps', 0)
+            fps_str = f"{fps:.1f}" if isinstance(fps, (int, float)) else "N/A"
+            
+            latency = perf.get('latency', 0)
+            latency_str = f"{latency:.1f}" if isinstance(latency, (int, float)) else "N/A"
+            
+            # Construir caption formatado (reduzido)
             caption = (
                 f"🚨 ALERTA DE DETECÇÃO\n"
                 f"{'━' * 12}\n"
                 f"📹 Câmera {self.cam_id}\n"
                 f"⏰ {timestamp_formatted}\n"
-                f"👤 {person_count} pessoa{'s' if person_count != 1 else ''} detectada{'s' if person_count != 1 else ''}\n"
+                f"👤 {person_count} pessoa{'s' if person_count != 1 else ''}\n"
                 f"📊 Confiança: {conf_pct:.1f}%\n"
-                f"{'━' * 12}\n"
-                f"📡 Qualidade do Stream:\n"
-                f"  • FPS: {perf.get('fps', 'N/A')}\n"
-                f"  • Taxa: {real_bitrate:.2f} Mbps\n"
-                f"  • Latência: {perf.get('latency', 'N/A')}ms\n"
-                f"  • Protocolo: {perf.get('protocol', 'UDP')}\n"
-                f"{'━' * 12}\n"
-                f"🔑 Evento: {event_uid[:8]}... | Shot: {shot_idx}\n"
+                f"📡 FPS: {fps_str} | Latência: {latency_str}ms\n"
                 f"v{APP_VERSION}"
             )
             
