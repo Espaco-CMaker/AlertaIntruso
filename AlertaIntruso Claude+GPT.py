@@ -4,8 +4,8 @@ ALERTAINTRUSO — ALARME INTELIGENTE POR VISÃO COMPUTACIONAL (RTSP • YOLO •
 ================================================================================
 Arquivo:        AlertaIntruso Claude+GPT.py
 Projeto:        Sistema de Alarme Inteligente por Visão Computacional
-Versão:         4.3.19
-Data:           02/02/2026
+Versão:         4.3.20
+Data:           03/02/2026
 Autor:          Fabio Bettio
 Licença:        Uso educacional / experimental
 Status:         ESTÁVEL
@@ -22,6 +22,15 @@ de movimento.
 ================================================================================
 Changelog completo
 ================================================================================
+
+v4.3.20 (03/02/2026) [BUG FIX - CRÍTICO] (linhas: 1)
+    - FIX CRÍTICO: Corrigido bug da "última foto sem objetos detectados"
+    - CAUSA: Fotos pendentes eram salvas mesmo em frames SEM detecções
+    - CENÁRIO: Com skip_frames=2, último frame processado pode não ter pessoa
+    - PROBLEMA: Foto final chegava ao Telegram vazia/sem caixas de detecção
+    - SOLUÇÃO: Adicionado verificação `and boxes and self._person_present(cids)` na linha 995
+    - RESULTADO: Fotos agora só são tiradas quando há pessoas no frame ATUAL
+    - Garantia: Todas as fotos enviadas têm objetos detectados visíveis
 
 v4.3.19 (02/02/2026) [BUG FIX - CRÍTICO] (linhas: 0)
     - FIX CRÍTICO: Corrigido bug de "Confiança: 0.0%" em alertas Telegram
@@ -160,7 +169,7 @@ def set_ffmpeg_capture_options(transport: str = "udp") -> None:
 
 set_ffmpeg_capture_options("udp")
 
-APP_VERSION = "4.3.19"
+APP_VERSION = "4.3.20"
 MAX_THUMBS = 200
 
 # ----------------------------- Tips do Menu de Configurações -----------------------------
@@ -992,7 +1001,8 @@ class RTSPObjectDetector:
                         )
 
                 # Fotos pendentes (monotonic + limite global)
-                if self._pending_shots > 0:
+                # FIX CRÍTICO v4.3.20: só salvar foto se houver detecções no frame atual
+                if self._pending_shots > 0 and boxes and self._person_present(cids):
                     if (now_mono - self._last_shot_time) >= self._min_shot_interval:
                         if (now_mono - self._last_capture_time_global) >= self.min_capture_interval_s:
                             person_count = sum(1 for cid in cids if cid == 0)
