@@ -4,7 +4,7 @@ ALERTAINTRUSO — ALARME INTELIGENTE POR VISÃO COMPUTACIONAL (RTSP • YOLO •
 ================================================================================
 Arquivo:        AlertaIntruso Claude+GPT.py
 Projeto:        Sistema de Alarme Inteligente por Visão Computacional
-Versão:         4.3.9
+Versão:         4.3.19
 Data:           02/02/2026
 Autor:          Fabio Bettio
 Licença:        Uso educacional / experimental
@@ -22,6 +22,14 @@ de movimento.
 ================================================================================
 Changelog completo
 ================================================================================
+
+v4.3.19 (02/02/2026) [BUG FIX - CRÍTICO] (linhas: 0)
+    - FIX CRÍTICO: Corrigido bug de "Confiança: 0.0%" em alertas Telegram
+    - CAUSA: conf_avg era recalculado a cada foto usando detecções do frame atual
+    - PROBLEMA: Frames subsequentes sem detecções resultavam em conf_avg=0.0
+    - SOLUÇÃO: Armazenado conf_avg do evento inicial em _event_conf_avg
+    - RESULTADO: Todas as fotos do mesmo evento agora usam a confiança original
+    - Garantia: Valor de confiança consistente em todas as fotos de um evento
 
 v4.2.4 (02/02/2026) [UI POLISH] (linhas: 0) (base v4.3.8)
     - NOVO: Spinner animado de loading durante conexão/boot das câmeras
@@ -152,7 +160,7 @@ def set_ffmpeg_capture_options(transport: str = "udp") -> None:
 
 set_ffmpeg_capture_options("udp")
 
-APP_VERSION = "4.3.9"
+APP_VERSION = "4.3.19"
 MAX_THUMBS = 200
 
 # ----------------------------- Tips do Menu de Configurações -----------------------------
@@ -526,6 +534,7 @@ class RTSPObjectDetector:
         self._last_event_time = 0.0
         self._pending_shots = 0
         self._event_uid = ""
+        self._event_conf_avg = 0.0  # Confiança média do evento (fixada na detecção inicial)
 
         # Capturas por evento (monotonic)
         self._last_shot_time = 0.0
@@ -967,6 +976,7 @@ class RTSPObjectDetector:
 
                         person_count = sum(1 for cid in cids if cid == 0)
                         conf_avg = (sum(confs) / len(confs)) if confs else 0.0
+                        self._event_conf_avg = conf_avg  # Armazena confiança do evento
                         best_conf = max(confs) if confs else 0.0
                         total_boxes = len(boxes)
 
@@ -986,7 +996,8 @@ class RTSPObjectDetector:
                     if (now_mono - self._last_shot_time) >= self._min_shot_interval:
                         if (now_mono - self._last_capture_time_global) >= self.min_capture_interval_s:
                             person_count = sum(1 for cid in cids if cid == 0)
-                            conf_avg = (sum(confs) / len(confs)) if confs else 0.0
+                            # Usa confiança armazenada do evento (não recalcula)
+                            conf_avg = self._event_conf_avg
                             shot_idx = (int(self.photos_per_event) - int(self._pending_shots) + 1)
                             
                             # Coletar nomes das classes detectadas

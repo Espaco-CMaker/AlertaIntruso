@@ -1,5 +1,34 @@
 # CHANGELOG - AlertaIntruso
 
+## v4.3.19 (02/02/2026)
+### 🐛 Correção Crítica
+- **BUG FIX CRÍTICO**: Corrigido bug de "Confiança: 0.0%" em alertas Telegram
+- **Causa**: `conf_avg` era recalculado a cada foto usando apenas as detecções do frame atual
+- **Problema**: Frames subsequentes sem detecções acima do threshold resultavam em `conf_avg=0.0`
+- **Solução**: Armazenado `conf_avg` do evento inicial no atributo `_event_conf_avg`
+- **Resultado**: Todas as fotos do mesmo evento agora usam a confiança original da detecção que disparou o evento
+- **Garantia**: Valor de confiança consistente e correto em todas as fotos de um evento
+
+## v4.3.18 (02/02/2026)
+### 🎨 Melhorias Visuais + 🐛 Correção
+- **Telegram**: Emoji-based color coding para níveis de confiança
+  - 🟢 Verde: Confiança ≥ 70%
+  - 🟡 Amarelo: Confiança entre 50-69%
+  - 🟠 Laranja: Confiança < 50%
+- **Telegram**: Alertas críticos com código de cores
+  - 🔴 Vermelho: Problemas críticos (RTSP, conexão)
+  - 🟠 Laranja: Avisos (reconnect, falhas)
+  - 🟡 Amarelo: Informações críticas
+- **FIX**: Safe division em `conf_pct` para evitar display incorreto
+
+## v4.3.17 (02/02/2026)
+### 🐛 Correção Crítica
+- **BUG FIX**: Adicionada dupla validação de confiança após NMS
+- **Causa**: `cv2.dnn.NMSBoxes` não filtra por threshold de confiança
+- **Problema**: Detecções com confiança abaixo do threshold configurado eram aceitas
+- **Solução**: Loop de validação adicional após NMS verificando `confs[i] >= self.conf_th`
+- **Garantia**: Apenas detecções com confiança ≥ threshold configurado são processadas
+
 ## v4.3.16 (02/02/2026)
 ### 🐛 Correções
 - **Performance**: Fallback para bitrate interno se NetworkMonitor indisponível
