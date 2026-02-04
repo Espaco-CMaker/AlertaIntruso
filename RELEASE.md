@@ -1,4 +1,4 @@
-# 🎉 AlertaIntruso v4.5.5 - Release Summary
+# 🎉 AlertaIntruso v4.5.6 - Release Summary
 
 **Data de Release**: 04/02/2026  
 **Commits**: Atualizações contínuas  
@@ -9,8 +9,8 @@
 ## 📊 Release Overview
 
 ```
-v4.3.16 ──→ v4.5.0 ──→ v4.5.4 ──→ v4.5.5
- (Base)     (Logs+Fotos) (Logs Padron.) (Aceite)
+v4.3.16 ─── v4.5.0 ─── v4.5.4 ─── v4.5.5 ─── v4.5.6
+ (Base)     (Logs+Fotos) (Logs Padron.) (Aceite)  (Valid.)
 ```
 
 ### Estatísticas

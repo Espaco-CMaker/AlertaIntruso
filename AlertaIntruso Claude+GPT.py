@@ -4,7 +4,7 @@ ALERTAINTRUSO — ALARME INTELIGENTE POR VISÃO COMPUTACIONAL (RTSP • YOLO •
 ================================================================================
 Arquivo:        AlertaIntruso Claude+GPT.py
 Projeto:        Sistema de Alarme Inteligente por Visão Computacional
-Versão:         4.5.5
+Versão:         4.5.6
 Data:           04/02/2026
 Autor:          Fabio Bettio
 Licença:        Uso educacional / experimental
@@ -22,6 +22,12 @@ de movimento.
 ================================================================================
 Changelog completo
 ================================================================================
+
+v4.5.6 (04/02/2026) [VALIDAÇÃO FINAL] (linhas: 0)
+    - VALIDADO: Controle de qualidade JPEG configurável (50-100) na aba Config
+    - VALIDADO: Layout UI ajustado sem sobreposição de controles
+    - VALIDADO: Fotos enviadas ao Telegram com qualidade configurável
+    - VALIDADO: Sistema estável e pronto para uso
 
 v4.5.5 (04/02/2026) [ACEITE - ESTABILIZAÇÃO] (linhas: 0)
     - FIX: Callback de foto e fila corrigidos (crop_path) + método enviar_grupo_fotos()
@@ -257,6 +263,7 @@ CONFIGURATION_TIPS = {
     "photos": "Quantidade de fotos capturadas por evento de detecção",
     "min_capture": "Intervalo mínimo (segundos) entre cada foto capturada em um evento",
     "max_photos": "Número máximo de fotos (geral + crop) mantidas no diretório. Fotos mais antigas são excluídas automaticamente.",
+    "jpeg_quality": "Qualidade JPEG das fotos enviadas ao Telegram (1-100). Valores maiores = mais qualidade e arquivo maior.",
     "person": "Disparar alerta quando pessoa é detectada",
     "car": "Disparar alerta quando carro é detectado",
     "bus": "Disparar alerta quando ônibus é detectado",
@@ -801,6 +808,7 @@ class RTSPObjectDetector:
 
         self.inf_times: List[float] = []
         self.last_performance: Dict[str, Any] = {}
+        self.telegram_jpeg_quality = 100
 
         # Métricas de rede/stream
         self._frame_timestamps: List[float] = []  # Para calcular jitter
@@ -1103,15 +1111,20 @@ class RTSPObjectDetector:
         # Limpar fotos antigas se necessário (manter apenas max_photos_keep)
         self._cleanup_old_photos()
 
-        # Salvar foto geral (com boxes)
+        # Salvar foto geral (com boxes) - qualidade configurável
         path = self.foto_dir / filename
-        cv2.imwrite(str(path), frame_bgr_with_boxes)
+        jpeg_quality = int(getattr(self, "telegram_jpeg_quality", 100) or 100)
+        if jpeg_quality < 1:
+            jpeg_quality = 1
+        if jpeg_quality > 100:
+            jpeg_quality = 100
+        cv2.imwrite(str(path), frame_bgr_with_boxes, [int(cv2.IMWRITE_JPEG_QUALITY), jpeg_quality])
         
         # Extrair e salvar crop do objeto detectado
         path_crop = self.foto_dir / filename_crop
         crop = self._extract_object_crop(frame_bgr_clean, boxes)
         if crop is not None:
-            cv2.imwrite(str(path_crop), crop)
+            cv2.imwrite(str(path_crop), crop, [int(cv2.IMWRITE_JPEG_QUALITY), jpeg_quality])
 
         self.log.log(
             "INFO",
@@ -1660,6 +1673,7 @@ class InterfaceGrafica:
                 "skip_frames": "2",  # Pula 2 frames (processa 1 a cada 3) - melhora performance
                 "input_size": "320",  # Resolução YOLO (320=rápido, 416=preciso, 608=lento)
                 "rtsp_transport": "udp",  # UDP (padrão) ou TCP
+                "jpeg_quality": "100",  # Qualidade JPEG do Telegram
             },
             "TELEGRAM": {
                 "bot_token": "",
@@ -1717,6 +1731,7 @@ class InterfaceGrafica:
         self.config["DETECTOR"]["min_capture_interval_s"] = self.sp_min_capture.get().strip()
         self.config["DETECTOR"]["rtsp_transport"] = self.cb_rtsp_transport.get().strip().lower()
         self.config["DETECTOR"]["max_photos_keep"] = self.sp_max_photos.get().strip()
+        self.config["DETECTOR"]["jpeg_quality"] = self.sp_jpeg_quality.get().strip()
 
         enabled = []
         if self.var_person.get(): enabled.append("person")
@@ -1983,6 +1998,14 @@ class InterfaceGrafica:
         self.sp_max_photos.set(self.config["DETECTOR"].get("max_photos_keep", "500"))
         self._add_tooltip_to_widget(lbl_max_photos, CONFIGURATION_TIPS["max_photos"])
         self._add_tooltip_to_widget(self.sp_max_photos, CONFIGURATION_TIPS["max_photos"])
+
+        lbl_jpeg_quality = ttk.Label(det, text="Qualidade JPEG:")
+        lbl_jpeg_quality.grid(row=2, column=0, sticky="w")
+        self.sp_jpeg_quality = ttk.Spinbox(det, from_=50, to=100, increment=1, width=6)
+        self.sp_jpeg_quality.grid(row=2, column=1, padx=6, pady=4, sticky="w")
+        self.sp_jpeg_quality.set(self.config["DETECTOR"].get("jpeg_quality", "100"))
+        self._add_tooltip_to_widget(lbl_jpeg_quality, CONFIGURATION_TIPS["jpeg_quality"])
+        self._add_tooltip_to_widget(self.sp_jpeg_quality, CONFIGURATION_TIPS["jpeg_quality"])
 
         # ========== CLASSES ==========
         cls = ttk.LabelFrame(wrap, text="Classes (somente pessoa dispara alerta)", padding=10)
@@ -2793,6 +2816,7 @@ class InterfaceGrafica:
         det.skip_frames = int(self.config["DETECTOR"].get("skip_frames", "2"))
         det.input_size = int(self.config["DETECTOR"].get("input_size", "320"))
         det.max_photos_keep = int(self.config["DETECTOR"].get("max_photos_keep", "500"))
+        det.telegram_jpeg_quality = int(self.config["DETECTOR"].get("jpeg_quality", "100"))
 
         name_to_id = {
             "person": 0, "bicycle": 1, "car": 2, "motorcycle": 3,
@@ -3048,7 +3072,12 @@ class InterfaceGrafica:
             foto_dir = Path("fotos")
             foto_dir.mkdir(exist_ok=True)
             foto_path = foto_dir / f"teste_telegram_{file_ts}.jpg"
-            img.save(foto_path, "JPEG", quality=85)
+            jpeg_quality = int(self.config["DETECTOR"].get("jpeg_quality", "100"))
+            if jpeg_quality < 1:
+                jpeg_quality = 1
+            if jpeg_quality > 100:
+                jpeg_quality = 100
+            img.save(foto_path, "JPEG", quality=jpeg_quality)
 
             caption = (
                 "🧪 TESTE DE DETECÇÃO\n"

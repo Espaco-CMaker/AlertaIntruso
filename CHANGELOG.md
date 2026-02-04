@@ -1,5 +1,12 @@
 # CHANGELOG - AlertaIntruso
 
+## v4.5.6 (04/02/2026)
+### ✅ Validação Final
+- **VALIDADO**: Controle de qualidade JPEG configurável (50-100) na aba Config
+- **VALIDADO**: Layout UI ajustado sem sobreposição de controles
+- **VALIDADO**: Fotos enviadas ao Telegram com qualidade configurável
+- **VALIDADO**: Sistema estável e pronto para uso
+
 ## v4.5.5 (04/02/2026)
 ### ✅ Aceite & Estabilização
 - **FIX**: `photo_callback` e fila de fotos corrigidos (inclui `crop_path`)
