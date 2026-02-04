@@ -28,6 +28,15 @@ Status:         ESTÁVEL  ← ATUALIZAR SE NECESSÁRIO
 ### 2. Constante APP_VERSION
 - [ ] Atualizar `APP_VERSION = "X.Y.Z"`
 
+### 2.1. Título da Janela
+- [ ] Garantir que o título da janela usa a versão atual (`APP_VERSION`)
+
+**Localização**: [AlertaIntruso Claude+GPT.py](AlertaIntruso%20Claude+GPT.py#L1363)
+
+```python
+self.root.title(f"AlertaIntruso v{APP_VERSION} — 4 Câmeras RTSP (YOLO)")
+```
+
 **Localização**: Procurar por `APP_VERSION = ` (normalmente por volta da linha 185)
 
 ```python
