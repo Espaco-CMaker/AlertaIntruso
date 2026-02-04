@@ -12,6 +12,8 @@ log.txt
 *.tmp
 *.cache
 fotos/
+build/
+dist/models/
 
 # VS Code
 .vscode/
