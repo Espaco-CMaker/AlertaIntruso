@@ -152,6 +152,7 @@ import queue
 import configparser
 import urllib.request
 import requests
+import webbrowser
 from datetime import datetime
 from pathlib import Path
 import time
@@ -2158,6 +2159,32 @@ class InterfaceGrafica:
         ttk.Label(self.frame_about, text="Autor: Fabio Bettio", font=("Arial", 10)).pack(pady=5)
         ttk.Label(self.frame_about, text="Data:           02/02/2026", font=("Arial", 10)).pack(pady=5)
         ttk.Label(self.frame_about, text="Licença: Uso educacional/experimental", font=("Arial", 10)).pack(pady=5)
+
+        ttk.Label(
+            self.frame_about,
+            text=(
+                "Projeto de monitoramento 24/7 de múltiplas câmeras RTSP com detecção "
+                "de pessoas via YOLOv4-tiny (OpenCV DNN), alertas Telegram, logs detalhados "
+                "e rastreabilidade de eventos."
+            ),
+            font=("Arial", 10),
+            wraplength=520,
+            justify="left"
+        ).pack(pady=(10, 6))
+
+        ttk.Label(
+            self.frame_about,
+            text="Recursos: detecção em tempo real, grupos por evento, métricas de performance, "
+                 "controle de falsos positivos e captura persistente de fotos.",
+            font=("Arial", 10),
+            wraplength=520,
+            justify="left"
+        ).pack(pady=(0, 10))
+
+        repo_url = "https://github.com/Espaco-CMaker/AlertaIntruso"
+        link = tk.Label(self.frame_about, text=repo_url, fg="#1a73e8", cursor="hand2", font=("Arial", 10, "underline"))
+        link.pack(pady=(2, 0))
+        link.bind("<Button-1>", lambda e: webbrowser.open_new(repo_url))
 
     def _load_logs_tail(self):
         lf = Path("log.txt")
