@@ -4,6 +4,12 @@ Este documento detalha o processo para atualizar a versão do AlertaIntruso de f
 
 ## 📋 Checklist Obrigatório para Cada Versão
 
+### ✅ Procedimento de Aceite (sempre que validar uma versão)
+- [ ] Incrementar **PATCH** (último dígito)
+- [ ] Atualizar docs: CHANGELOG.md, README.md, STATUS.md, RELEASE.md
+- [ ] Gerar executável versionado: `AlertaIntruso-vX.Y.Z.exe`
+- [ ] Atualizar Git (add/commit/push) com código + docs + executável
+
 ### 1. Cabeçalho do Programa (AlertaIntruso Claude+GPT.py)
 - [ ] Atualizar versão em: `Versão:         X.Y.Z`
 - [ ] Atualizar data em: `Data:           DD/MM/YYYY`
@@ -163,7 +169,7 @@ git push origin main
 
 ## 📌 Última Atualização
 
-- **Versão**: 4.5.0
+- **Versão**: 4.5.5
 - **Data**: 04/02/2026
 - **Próxima revisão**: Conforme necessário
 

@@ -1,5 +1,15 @@
 # CHANGELOG - AlertaIntruso
 
+## v4.5.5 (04/02/2026)
+### ✅ Aceite & Estabilização
+- **FIX**: `photo_callback` e fila de fotos corrigidos (inclui `crop_path`)
+- **FIX**: Implementado `TelegramBot.enviar_grupo_fotos()` (sendMediaGroup)
+- **LOG**: STDERR classificado como **ERROR**
+- **LOG**: Filtros INFO/WARN/ERROR movidos para a aba Logs
+- **LOG**: Botão “Limpar Logs” apaga histórico (log.txt) e fila
+- **TELEGRAM**: Watchdog não é mais enviado; WARN não é enviado ao Telegram
+- **UI**: Separadores compactados nas mensagens do Telegram
+
 ## v4.3.19 (02/02/2026)
 ### 🐛 Correção Crítica
 - **BUG FIX CRÍTICO**: Corrigido bug de "Confiança: 0.0%" em alertas Telegram

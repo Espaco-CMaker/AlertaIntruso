@@ -1,7 +1,7 @@
-# 🎉 AlertaIntruso v4.3.16 - Release Summary
+# 🎉 AlertaIntruso v4.5.5 - Release Summary
 
-**Data de Release**: 02/02/2026  
-**Commits**: 14 versões em 1 sessão  
+**Data de Release**: 04/02/2026  
+**Commits**: Atualizações contínuas  
 **Status**: ✅ Production Ready
 
 ---
@@ -9,12 +9,12 @@
 ## 📊 Release Overview
 
 ```
-v4.2.4 ──→ v4.3.0 ──→ v4.3.5 ──→ v4.3.10 ──→ v4.3.16
- (Start)   (Telegram) (GUI+Test) (RTSP Fix) (Final)
+v4.3.16 ──→ v4.5.0 ──→ v4.5.4 ──→ v4.5.5
+ (Base)     (Logs+Fotos) (Logs Padron.) (Aceite)
 ```
 
 ### Estatísticas
-- **14 versões** lançadas
+- **Múltiplas versões** lançadas
 - **6 abas** de interface funcional
 - **4 câmeras** suportadas simultaneamente
 - **10+ métricas** de performance
@@ -30,11 +30,17 @@ v4.2.4 ──→ v4.3.0 ──→ v4.3.5 ──→ v4.3.10 ──→ v4.3.16
 - ✅ Timeout aumentado para 10s (conexões lentas)
 - ✅ Watchdog com auto-recovery
 
+### 🧾 Logs & Observabilidade
+- ✅ Classificação aprimorada (STDERR como ERROR)
+- ✅ Filtros de nível na aba Logs (INFO/WARN/ERROR)
+- ✅ Limpeza completa do histórico (log.txt + fila)
+
 ### 📱 Telegram Integration
 - ✅ Notificações com fotos + metadados
 - ✅ Detecção crítica automática
 - ✅ Botão de teste para validação
 - ✅ Mensagens amigáveis (emojis + formatação)
+- ✅ Envio de fotos em grupo (sendMediaGroup)
 
 ### 🖥️ Interface Gráfica
 - ✅ 6 abas funcionais (Vídeo, Config, Fotos, Logs, Performance, Sobre)
@@ -55,7 +61,7 @@ v4.2.4 ──→ v4.3.0 ──→ v4.3.5 ──→ v4.3.10 ──→ v4.3.16
 
 ### 🔐 Reliability
 - ✅ Tratamento de exceções completo
-- ✅ Log rotation (1MB + backup)
+- ✅ Log rotation (5MB + backup)
 - ✅ Config persistence
 - ✅ Recovery automático
 

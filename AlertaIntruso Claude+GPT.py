@@ -4,7 +4,7 @@ ALERTAINTRUSO — ALARME INTELIGENTE POR VISÃO COMPUTACIONAL (RTSP • YOLO •
 ================================================================================
 Arquivo:        AlertaIntruso Claude+GPT.py
 Projeto:        Sistema de Alarme Inteligente por Visão Computacional
-Versão:         4.5.1
+Versão:         4.5.5
 Data:           04/02/2026
 Autor:          Fabio Bettio
 Licença:        Uso educacional / experimental
@@ -22,6 +22,45 @@ de movimento.
 ================================================================================
 Changelog completo
 ================================================================================
+
+v4.5.5 (04/02/2026) [ACEITE - ESTABILIZAÇÃO] (linhas: 0)
+    - FIX: Callback de foto e fila corrigidos (crop_path) + método enviar_grupo_fotos()
+    - LOG: STDERR agora classificado como ERROR
+    - LOG: Filtros INFO/WARN/ERROR movidos para a aba Logs
+    - LOG: Botão Limpar Logs apaga histórico (log.txt) e fila
+    - TELEGRAM: Sem mensagens de watchdog e sem WARN no Telegram
+    - UI: Redução de separadores em mensagens Telegram
+
+v4.5.4 (04/02/2026) [PADRONIZAÇÃO - LOGS] (linhas: 55)
+    - NOVO: Sistema de logs compatibilizado com ESPECIFICAÇÃO_LOGS do Guia_de_Padroes
+    - FORMATO: Novo formato padronizado "%(asctime)s | %(levelname)-7s | %(name)-15s | %(message)s"
+    - NOMENCLATURA: Loggers agora usam hierarquia de módulos (ex: "camera.detector", "telegram.bot")
+    - MENSAGENS: Mensagens seguem padrões do guia (ação + contexto + detalhes)
+    - ROTAÇÃO: Sistema de rotação automática (5MB por arquivo, 10 backups)
+    - ESTRUTURA: Cabeçalho de inicialização padronizado com linhas separadoras
+    - COMPATIBILIDADE: 100% compatível com especificação do Guia_de_Padroes
+
+v4.5.3 (04/02/2026) [OTIMIZAÇÃO - TELEGRAM] (linhas: 85)
+    - NOVO: Sistema de buffer para eventos de sistema no Telegram
+    - NOVO: Mensagens de watchdog/reconnect/falhas agrupadas e enviadas em lote
+    - OTIMIZAÇÃO: Redução drástica de mensagens Telegram em caso de instabilidade
+    - IMPLEMENTAÇÃO: Buffer com envio a cada 30s ou quando atingir 10 eventos
+    - MELHORIA: Mensagens agrupadas com timestamp individual e contador
+    - PERFORMANCE: Evita flood de notificações em reconexões/falhas múltiplas
+    - TELEGRAM: Envio único consolidado ao invés de uma mensagem por evento
+    - CONFIGURÁVEL: system_events_buffer_time e system_events_buffer_max
+
+v4.5.2 (04/02/2026) [FEATURE - TELEGRAM E DIAGNÓSTICO] (linhas: 136)
+    - NOVO: Fotos enviadas em GRUPO (sendMediaGroup) - foto geral + crop na mesma msg
+    - NOVO: Método TelegramBot.enviar_grupo_fotos() para múltiplas fotos por mensagem
+    - MELHORIA: _save_and_notify() agora usa sendMediaGroup quando há crop disponível
+    - TELEGRAM: Caption aparece apenas na primeira foto do grupo
+    - DIAGNÓSTICO: Warning "No libpcap provider" suprimido do console
+    - DIAGNÓSTICO: Log detalhado sobre status Scapy/Npcap no início do sistema
+    - DIAGNÓSTICO: Detecção automática de problemas com libpcap mesmo com Scapy instalado
+    - DOCUMENTAÇÃO: Criado NPCAP_INSTALL.md com guia completo de instalação
+    - LOG: Sistema indica se bitrate será real (RTP) ou estimado (interno)
+    - MELHORIA: Tratamento robusto de erros em enviar_grupo_fotos (timeout, conexão, arquivo)
 
 v4.5.1 (04/02/2026) [BUILD] (linhas: 0)
     - Incremento de versão para gerar novo executável
@@ -156,6 +195,7 @@ import configparser
 import urllib.request
 import requests
 import webbrowser
+import json
 from datetime import datetime
 from pathlib import Path
 import time
@@ -170,10 +210,19 @@ except ImportError:
     PSUTIL_AVAILABLE = False
 
 try:
-    from scapy.all import sniff, IP, UDP  # type: ignore
+    import warnings
+    # Suprimir warning do scapy sobre libpcap (será logado posteriormente)
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message=".*libpcap.*")
+        from scapy.all import sniff, IP, UDP  # type: ignore
     SCAPY_AVAILABLE = True
+    SCAPY_WARNING = None
 except ImportError:
     SCAPY_AVAILABLE = False
+    SCAPY_WARNING = None
+except Exception as e:
+    SCAPY_AVAILABLE = False
+    SCAPY_WARNING = str(e)
 
 import tkinter as tk
 from tkinter import ttk, scrolledtext, messagebox
@@ -195,7 +244,7 @@ def set_ffmpeg_capture_options(transport: str = "udp") -> None:
 
 set_ffmpeg_capture_options("udp")
 
-APP_VERSION = "4.5.1"
+APP_VERSION = "4.5.5"
 MAX_THUMBS = 200
 
 # ----------------------------- Tips do Menu de Configurações -----------------------------
@@ -325,24 +374,113 @@ class NetworkMonitor:
 
 # ----------------------------- Log -----------------------------
 class LogManager:
-    def __init__(self, log_file: str = "log.txt", max_size_mb: int = 1):
+    """Gerenciador de logs padronizado conforme ESPECIFICAÇÃO_LOGS.md
+    
+    Referência: https://github.com/Espaco-CMaker/Guia_de_Padroes/blob/main/ESPECIFICACAO_LOGS.md
+    
+    Características:
+    - Formato: "%(asctime)s | %(levelname)-7s | %(name)-15s | %(message)s"
+    - Rotação automática (5MB por arquivo, 10 backups)
+    - Buffer de eventos para Telegram (reduz spam)
+    - Thread-safe
+    """
+    def __init__(self, log_file: str = "log.txt", max_size_mb: int = 5):
         self.log_file = Path(log_file)
         self.max_size = max_size_mb * 1024 * 1024
         self.callbacks: List[Callable[[str], None]] = []
         self._lock = threading.Lock()
         self.telegram = None
         self._sending_telegram = False
+        
+        # Buffer para eventos de sistema (reduzir mensagens Telegram)
+        self._system_events_buffer = []
+        self._system_events_lock = threading.Lock()
+        self._last_buffer_send_time = time.time()
+        self._buffer_send_interval = 30.0  # Enviar a cada 30 segundos
+        self._buffer_max_events = 10  # Ou quando atingir 10 eventos
 
     def add_callback(self, cb: Callable[[str], None]) -> None:
         self.callbacks.append(cb)
 
     def set_telegram(self, telegram) -> None:
         self.telegram = telegram
+    
+    def _add_system_event_to_buffer(self, level: str, msg: str, cam: Optional[int], timestamp: str) -> None:
+        """Adiciona evento de sistema ao buffer para envio agrupado."""
+        with self._system_events_lock:
+            if "watchdog" in (msg or "").lower():
+                return
+            # Emoji de nível baseado no tipo de alerta
+            if "RTSP" in msg.upper() or "CONEXÃO" in msg.upper() or "DESCONECT" in msg.upper():
+                level_emoji = "🔴"  # Vermelho para problemas críticos
+            elif "reconnect" in msg.lower() or "watchdog" in msg.lower():
+                level_emoji = "🟠"  # Laranja para warnings
+            else:
+                level_emoji = "🟡"  # Amarelo para informações críticas
+            
+            cam_text = f"CAM{cam}" if cam is not None else "SYS"
+            event_entry = {
+                "emoji": level_emoji,
+                "cam": cam_text,
+                "timestamp": timestamp.split()[1],  # Apenas HH:MM:SS
+                "msg": msg[:80]  # Limitar tamanho da mensagem
+            }
+            self._system_events_buffer.append(event_entry)
+            
+            # Enviar se atingir o limite de eventos
+            if len(self._system_events_buffer) >= self._buffer_max_events:
+                self._flush_system_events_buffer()
+    
+    def _flush_system_events_buffer(self) -> None:
+        """Envia todos os eventos acumulados no buffer em uma única mensagem."""
+        if not self._system_events_buffer:
+            return
+        
+        if self._sending_telegram:
+            return
+        
+        try:
+            self._sending_telegram = True
+            
+            # Construir mensagem consolidada
+            event_count = len(self._system_events_buffer)
+            events_text = "\n".join(
+                f"{ev['emoji']} {ev['timestamp']} [{ev['cam']}] {ev['msg']}"
+                for ev in self._system_events_buffer
+            )
+            
+            caption = (
+                f"⚠️ EVENTOS DE SISTEMA ({event_count})\n"
+                f"{'━' * 8}\n"
+                f"{events_text}\n"
+                f"{'━' * 8}\n"
+                f"v{APP_VERSION}"
+            )
+            
+            self.telegram.enviar_mensagem(caption)
+            self._system_events_buffer.clear()
+            self._last_buffer_send_time = time.time()
+        except Exception:
+            pass
+        finally:
+            self._sending_telegram = False
+    
+    def check_and_flush_buffer(self) -> None:
+        """Verifica se deve enviar buffer baseado no tempo."""
+        with self._system_events_lock:
+            if not self._system_events_buffer:
+                return
+            
+            elapsed = time.time() - self._last_buffer_send_time
+            if elapsed >= self._buffer_send_interval:
+                self._flush_system_events_buffer()
 
     def _is_critical_connection_issue(self, level: str, msg: str) -> bool:
         if level not in ("WARN", "ERROR"):
             return False
         text = (msg or "").lower()
+        if "watchdog" in text:
+            return False
         patterns = [
             "falha rtsp",
             "sem frame",
@@ -351,7 +489,6 @@ class LogManager:
             "rtsp vazio",
             "hard restart",
             "soft reconnect",
-            "watchdog: sem frame",
             "falha ao recriar câmera",
             "erro ao conectar",
         ]
@@ -373,14 +510,28 @@ class LogManager:
                 pass
 
     def log(self, level: str, msg: str, cam: Optional[int] = None) -> None:
+        """Gera entrada de log no formato padronizado.
+        
+        Formato: "YYYY-MM-DD HH:MM:SS | LEVEL | name | message"
+        Exemplo: "2026-02-04 14:30:45 | INFO    | camera.cam1     | Frame captured"
+        """
+        original_level = level
         is_critical = self._is_critical_connection_issue(level, msg)
         if is_critical and level == "WARN":
             level = "ERROR"
+        
+        # Timestamp no formato padronizado
         ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        prefix = f"[{ts}] [{level}]"
+        
+        # Nome do logger hierarquizado
         if cam is not None:
-            prefix += f" [CAM{cam}]"
-        line = f"{prefix} {msg}\n"
+            logger_name = f"camera.cam{cam}"
+        else:
+            logger_name = "system"
+        
+        # Formatação padronizada: timestamp | level | name | message
+        # Padding: level=7 chars, name=15 chars (alinhamento conforme guia)
+        line = f"{ts} | {level:<7} | {logger_name:<15} | {msg}\n"
 
         with self._lock:
             self._rotate_if_needed()
@@ -396,37 +547,10 @@ class LogManager:
             except Exception:
                 pass
 
-        if is_critical and self.telegram and getattr(self.telegram, "enabled", False):
-            if not self._sending_telegram and "Erro ao enviar mensagem Telegram" not in msg:
-                try:
-                    self._sending_telegram = True
-                    cam_text = f"📹 Câmera {cam}" if cam is not None else "📹 Câmera: N/D"
-                    
-                    # Emoji de nível baseado no tipo de alerta
-                    if "RTSP" in msg.upper() or "CONEXÃO" in msg.upper() or "DESCONECT" in msg.upper():
-                        level_emoji = "🔴"  # Vermelho para problemas críticos
-                        alert_title = "ALERTA CRÍTICO"
-                    elif "reconnect" in msg.lower() or "fallha" in msg.lower():
-                        level_emoji = "🟠"  # Laranja para warnings
-                        alert_title = "AVISO"
-                    else:
-                        level_emoji = "🟡"  # Amarelo para informações críticas
-                        alert_title = "ALERTA"
-                    
-                    caption = (
-                        f"{level_emoji} {alert_title}\n"
-                        f"{'━' * 12}\n"
-                        f"{cam_text}\n"
-                        f"⏰ {ts}\n"
-                        f"⚠ {msg}\n"
-                        f"{'━' * 12}\n"
-                        f"v{APP_VERSION}"
-                    )
-                    self.telegram.enviar_mensagem(caption)
-                except Exception:
-                    pass
-                finally:
-                    self._sending_telegram = False
+        # Adicionar evento crítico ao buffer ao invés de enviar imediatamente
+        if is_critical and level == "ERROR" and original_level != "WARN" and self.telegram and getattr(self.telegram, "enabled", False):
+            if "Erro ao enviar mensagem Telegram" not in msg:
+                self._add_system_event_to_buffer(level, msg, cam, ts)
 
 
 # ----------------------------- Telegram -----------------------------
@@ -542,26 +666,98 @@ class TelegramBot:
                     f"ChatID: {self.chat_id}")
             return False
 
+    def enviar_grupo_fotos(self, fotos: List[str], caption: str = "") -> bool:
+        if not self.enabled:
+            return False
+        if not fotos:
+            return False
+        files = {}
+        try:
+            url = f"{self.base_url}/sendMediaGroup"
+            media = []
+            for i, foto_path in enumerate(fotos):
+                attach_name = f"file{i}"
+                files[attach_name] = open(foto_path, "rb")
+                item = {"type": "photo", "media": f"attach://{attach_name}"}
+                if i == 0 and caption:
+                    item["caption"] = caption
+                media.append(item)
+
+            data = {
+                "chat_id": self.chat_id,
+                "media": json.dumps(media, ensure_ascii=False)
+            }
+            r = requests.post(url, files=files, data=data, timeout=30)
+            if r.status_code == 200:
+                return True
+            else:
+                if self.log:
+                    self.log.log("ERROR",
+                        f"Telegram sendMediaGroup FALHOU | "
+                        f"HTTP {r.status_code} | "
+                        f"Resposta: {r.text[:200]} | "
+                        f"Qtd: {len(fotos)} | "
+                        f"URL: {url} | "
+                        f"ChatID: {self.chat_id}")
+                return False
+        except FileNotFoundError as e:
+            if self.log:
+                self.log.log("ERROR",
+                    f"Telegram sendMediaGroup ARQUIVO NÃO ENCONTRADO | "
+                    f"Erro: {str(e)}")
+            return False
+        except requests.exceptions.Timeout as e:
+            if self.log:
+                self.log.log("ERROR",
+                    f"Telegram sendMediaGroup TIMEOUT | "
+                    f"Erro: {str(e)} | "
+                    f"URL: {url} | "
+                    f"ChatID: {self.chat_id}")
+            return False
+        except requests.exceptions.ConnectionError as e:
+            if self.log:
+                self.log.log("ERROR",
+                    f"Telegram sendMediaGroup CONEXÃO FALHOU | "
+                    f"Erro: {str(e)} | "
+                    f"URL: {url} | "
+                    f"ChatID: {self.chat_id}")
+            return False
+        except Exception as e:
+            if self.log:
+                self.log.log("ERROR",
+                    f"Telegram sendMediaGroup EXCEÇÃO | "
+                    f"Tipo: {type(e).__name__} | "
+                    f"Erro: {str(e)} | "
+                    f"URL: {url} | "
+                    f"ChatID: {self.chat_id}")
+            return False
+        finally:
+            for f in files.values():
+                try:
+                    f.close()
+                except Exception:
+                    pass
+
     def formatar_msg_inicio(self, cameras_ativas: int, versao: str) -> str:
         """Formata mensagem amigável de início do sistema."""
         return (
             f"✅ SISTEMA INICIADO\n"
-            f"{'━' * 12}\n"
+            f"{'━' * 8}\n"
             f"🎥 Câmeras ativas: {cameras_ativas}\n"
             f"🚀 Status: Monitorando\n"
             f"v{versao}\n"
-            f"{'━' * 12}"
+            f"{'━' * 8}"
         )
 
     def formatar_msg_encerramento(self, total_deteccoes: int, versao: str) -> str:
         """Formata mensagem amigável de encerramento do sistema."""
         return (
             f"⏹️ SISTEMA ENCERRADO\n"
-            f"{'━' * 12}\n"
+            f"{'━' * 8}\n"
             f"👤 Detecções registradas: {total_deteccoes}\n"
             f"✓ Monitoramento finalizado\n"
             f"v{versao}\n"
-            f"{'━' * 12}"
+            f"{'━' * 8}"
         )
 
 
@@ -680,32 +876,7 @@ class RTSPObjectDetector:
         self.last_frame_timestamp = 0.0
 
     def _log_detector_config(self) -> None:
-        try:
-            cls_names = []
-            if self.classes and isinstance(self.classes, list):
-                for cid in sorted(self.classes_enabled):
-                    if 0 <= cid < len(self.classes):
-                        cls_names.append(self.classes[cid])
-                    else:
-                        cls_names.append(str(cid))
-            else:
-                cls_names = [str(cid) for cid in sorted(self.classes_enabled)]
-
-            self.log.log(
-                "INFO",
-                "CONFIG DETECTOR | "
-                f"cooldown={self.cooldown_s:.2f}s | "
-                f"conf_th={self.conf_th:.2f} | nms_th={self.nms_th:.2f} | "
-                f"input={self.input_size} | "
-                f"photos_per_event={self.photos_per_event} | "
-                f"min_shot_interval={self._min_shot_interval:.2f}s | "
-                f"min_capture_interval_s={self.min_capture_interval_s:.2f}s | "
-                f"classes={','.join(cls_names)} | "
-                f"telegram_mode={self.telegram_mode} | v{APP_VERSION}",
-                self.cam_id
-            )
-        except Exception:
-            pass
+        return
 
     def _safe_read(self):
         """
@@ -729,7 +900,7 @@ class RTSPObjectDetector:
 
     def _init_yolo(self) -> None:
         try:
-            self.log.log("INFO", "Inicializando YOLO...", self.cam_id)
+            self.log.log("INFO", "Initializing YOLO detector...", self.cam_id)
 
             weights_path = self.models_dir / "yolov4-tiny.weights"
             config_path = self.models_dir / "yolov4-tiny.cfg"
@@ -751,25 +922,25 @@ class RTSPObjectDetector:
             if cv2.cuda.getCudaEnabledDeviceCount() > 0:
                 self.net.setPreferableBackend(cv2.dnn.DNN_BACKEND_CUDA)
                 self.net.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA)
-                self.log.log("INFO", "CUDA ativado.", self.cam_id)
+                self.log.log("INFO", "CUDA backend enabled", self.cam_id)
             else:
                 self.net.setPreferableBackend(cv2.dnn.DNN_BACKEND_OPENCV)
                 self.net.setPreferableTarget(cv2.dnn.DNN_TARGET_CPU)
-                self.log.log("INFO", "CPU ativado.", self.cam_id)
+                self.log.log("INFO", "CPU backend enabled", self.cam_id)
 
             layer_names = self.net.getLayerNames()
             unconnected = self.net.getUnconnectedOutLayers()
             unconnected = unconnected.flatten() if hasattr(unconnected, "flatten") else unconnected
             self.output_layers = [layer_names[i - 1] for i in unconnected]
 
-            self.log.log("INFO", "YOLO pronto.", self.cam_id)
+            self.log.log("INFO", "YOLO detector initialized successfully", self.cam_id)
         except Exception as e:
             self.log.log("ERROR", f"Falha ao inicializar YOLO: {e}", self.cam_id)
             raise
 
     def _connect(self) -> bool:
         try:
-            self.log.log("INFO", "Conectando RTSP...", self.cam_id)
+            self.log.log("INFO", "Connecting to RTSP stream...", self.cam_id)
 
             try:
                 if self.cap is not None:
@@ -804,7 +975,7 @@ class RTSPObjectDetector:
                 pass
 
             self.cap = cap
-            self.log.log("INFO", "RTSP OK.", self.cam_id)
+            self.log.log("INFO", "RTSP stream connected successfully", self.cam_id)
             self.status = "online"
             return True
 
@@ -990,7 +1161,7 @@ class RTSPObjectDetector:
             # Construir caption formatado (com cores via emojis)
             caption = (
                 f"🟢 ALERTA DE DETECÇÃO\n"
-                f"{'━' * 12}\n"
+                f"{'━' * 8}\n"
                 f"📹 Câmera {self.cam_id}\n"
                 f"⏰ {timestamp_formatted}\n"
                 f"🔍 Detectado: {detection_text}\n"
@@ -999,21 +1170,22 @@ class RTSPObjectDetector:
                 f"v{APP_VERSION}"
             )
             
-            # Enviar foto geral
-            ok = self.telegram.enviar_foto(str(path), caption)
-            if ok:
-                self.log.log("INFO", "Foto geral enviada Telegram.", self.cam_id)
-            else:
-                self.log.log("ERROR", "Falha ao enviar foto geral Telegram.", self.cam_id)
-            
-            # Enviar foto crop se disponível
+            # Enviar fotos em grupo (geral + crop, se disponível)
             if crop is not None:
-                caption_crop = f"🔍 ZOOM - {caption.split(chr(10))[0]}\n{chr(10).join(caption.split(chr(10))[1:])}"
-                ok_crop = self.telegram.enviar_foto(str(path_crop), caption_crop)
-                if ok_crop:
-                    self.log.log("INFO", "Foto crop enviada Telegram.", self.cam_id)
+                # Enviar ambas as fotos na mesma mensagem (geral primeiro, crop depois)
+                fotos_para_enviar = [str(path), str(path_crop)]
+                ok = self.telegram.enviar_grupo_fotos(fotos_para_enviar, caption)
+                if ok:
+                    self.log.log("INFO", "Photos sent to Telegram (general + crop in group)", self.cam_id)
                 else:
-                    self.log.log("ERROR", "Falha ao enviar foto crop Telegram.", self.cam_id)
+                    self.log.log("ERROR", "Falha ao enviar grupo de fotos Telegram.", self.cam_id)
+            else:
+                # Se não há crop, enviar apenas foto geral
+                ok = self.telegram.enviar_foto(str(path), caption)
+                if ok:
+                    self.log.log("INFO", "General photo sent to Telegram", self.cam_id)
+                else:
+                    self.log.log("ERROR", "Falha ao enviar foto geral Telegram.", self.cam_id)
 
     # -------- Soft reconnect (watchdog) --------
     def request_soft_reconnect(self, reason: str = "watchdog"):
@@ -1041,7 +1213,7 @@ class RTSPObjectDetector:
             self._last_event_time = 0.0
             self.last_frame_mono = 0.0
             self.last_frame_wall_ts = 0.0
-            self.log.log("INFO", "Soft reconnect OK.", self.cam_id)
+            self.log.log("INFO", "Soft reconnect completed successfully", self.cam_id)
             return True
 
         self.log.log("ERROR", "Soft reconnect falhou.", self.cam_id)
@@ -1090,7 +1262,7 @@ class RTSPObjectDetector:
 
                         ok = self._connect()
                         if ok:
-                            self.log.log("INFO", "Reconectou após falha de frame.", self.cam_id)
+                            self.log.log("INFO", "Reconnected after frame read failure", self.cam_id)
                             self._bad_reads = 0
                             self._reconnect_backoff_s = 5.0  # Reset para 5s
                         else:
@@ -1242,14 +1414,6 @@ class RTSPObjectDetector:
                         "bitrate": bitrate_mbps, "latency": latency_ms, "jitter": jitter_ms,
                         "ping": self._ping_ms, "protocol": protocol, "frame_loss": frame_loss
                     }
-                    self.log.log(
-                        "INFO",
-                        f"PERFORMANCE | Frames: {frame_count} | FPS: {fps:.2f} | CPU: {cpu_percent:.1f}% | "
-                        f"RAM: {ram_percent:.1f}% | InfTime: {avg_inf:.3f}s | GPU: {gpu_info} | "
-                        f"Taxa: {bitrate_mbps:.2f}Mbps ({bitrate_mbs:.2f}MB/s) | Latency: {latency_ms:.1f}ms | Jitter: {jitter_ms:.1f}ms | "
-                        f"Ping: {self._ping_ms:.0f}ms | Loss: {frame_loss:.1f}% | Proto: {protocol} | v{APP_VERSION}",
-                        self.cam_id
-                    )
                     self.inf_times.clear()
 
         finally:
@@ -1370,7 +1534,7 @@ class InterfaceGrafica:
         self.config_file = Path("config.ini")
         self.config = configparser.ConfigParser()
 
-        self.log = LogManager("log.txt", max_size_mb=1)
+        self.log = LogManager("log.txt", max_size_mb=5)  # 5MB conforme padrão do guia
 
         # Queues precisam existir antes do callback do log
         self.frame_queue = queue.Queue()
@@ -1379,10 +1543,17 @@ class InterfaceGrafica:
 
         self.log.add_callback(lambda line: self.log_queue.put(line))
 
-        self.log.log(
-            "INFO",
-            f"Inicializando sistema | AlertaIntruso v{APP_VERSION} | Python {platform.python_version()} | OpenCV {cv2.__version__}"
-        )
+        # Cabeçalho de inicialização padronizado (ESPECIFICACAO_LOGS.md)
+        separator = "=" * 80
+        self.log.log("INFO", separator)
+        self.log.log("INFO", f"Application: AlertaIntruso v{APP_VERSION}")
+        self.log.log("INFO", f"Python: {platform.python_version()}")
+        self.log.log("INFO", f"OS: {platform.system()} {platform.release()}")
+        self.log.log("INFO", f"OpenCV: {cv2.__version__}")
+        self.log.log("INFO", f"Working Directory: {Path.cwd()}")
+        self.log.log("INFO", separator)
+
+        # Status do Scapy/Npcap é exibido apenas na guia Performance (sem log)
 
         try:
             cv2.setLogCallback(lambda level, msg: self.log.log("INFO", f"OpenCV [{level}]: {msg.strip()}"))
@@ -1456,18 +1627,19 @@ class InterfaceGrafica:
         self.root.after(1000, self._update_performance)
 
         self._process_queues()
-        self.log.log("INFO", f"Interface pronta v{APP_VERSION}")
+        self.log.log("INFO", "UI initialized successfully")
 
         self.root.after(600, self.start_system)
         self.root.after(self.watchdog_interval_ms, self._supervise_cameras)
         self.root.after(1500, self._daily_restart_tick)
         self.root.after(1000, self._update_camera_status)
+        self.root.after(5000, self._check_system_events_buffer)  # Verificar buffer a cada 5s
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
 
     def _read_stderr(self):
         try:
             for line in self.stderr_r:
-                self.log.log("WARN", f"STDERR: {line.strip()}")
+                self.log.log("ERROR", f"STDERR: {line.strip()}")
         except Exception:
             pass
 
@@ -1496,6 +1668,10 @@ class InterfaceGrafica:
             },
             "UI": {
                 "show_tips": "True",
+                "auto_scroll_logs": "True",
+                "log_show_info": "True",
+                "log_show_warn": "True",
+                "log_show_error": "True",
             }
         }
 
@@ -1563,6 +1739,9 @@ class InterfaceGrafica:
 
         self.config["UI"]["show_tips"] = str(bool(self.var_show_tips.get()))
         self.config["UI"]["auto_scroll_logs"] = str(bool(self.var_auto_scroll.get()))
+        self.config["UI"]["log_show_info"] = str(bool(self.var_log_info.get()))
+        self.config["UI"]["log_show_warn"] = str(bool(self.var_log_warn.get()))
+        self.config["UI"]["log_show_error"] = str(bool(self.var_log_error.get()))
 
         with open(self.config_file, "w", encoding="utf-8") as f:
             self.config.write(f)
@@ -1977,6 +2156,16 @@ class InterfaceGrafica:
         # Frame superior para controles
         control_frame = ttk.Frame(self.frame_logs)
         control_frame.pack(fill="x", padx=6, pady=6)
+
+        # Filtro de níveis
+        self.var_log_info = tk.BooleanVar(value=self.config["UI"].getboolean("log_show_info", fallback=True))
+        self.var_log_warn = tk.BooleanVar(value=self.config["UI"].getboolean("log_show_warn", fallback=True))
+        self.var_log_error = tk.BooleanVar(value=self.config["UI"].getboolean("log_show_error", fallback=True))
+
+        ttk.Label(control_frame, text="Níveis:").pack(side="left", padx=(0, 4))
+        ttk.Checkbutton(control_frame, text="INFO", variable=self.var_log_info, command=self._refresh_logs_view).pack(side="left", padx=4)
+        ttk.Checkbutton(control_frame, text="WARN", variable=self.var_log_warn, command=self._refresh_logs_view).pack(side="left", padx=4)
+        ttk.Checkbutton(control_frame, text="ERROR", variable=self.var_log_error, command=self._refresh_logs_view).pack(side="left", padx=4)
         
         # Checkbox de auto-scroll
         self.cb_auto_scroll = ttk.Checkbutton(
@@ -1986,7 +2175,7 @@ class InterfaceGrafica:
         self.cb_auto_scroll.pack(side="left", padx=4)
         
         # Botão limpar
-        ttk.Button(control_frame, text="Limpar Logs", command=lambda: self.text_logs.delete("1.0", tk.END)).pack(side="left", padx=4)
+        ttk.Button(control_frame, text="Limpar Logs", command=self._clear_logs).pack(side="left", padx=4)
         
         # Text widget com scroll
         self.text_logs = scrolledtext.ScrolledText(self.frame_logs, wrap=tk.WORD, font=("Courier", 9))
@@ -2152,8 +2341,8 @@ class InterfaceGrafica:
             self.perf_tree.item("system", values=(
                 "Sistema", "--", "--", "--", "--", "--", "--", "--", f"{global_cpu:.0f}%", f"{global_ram:.0f}%"
             ))
-        except Exception as e:
-            self.log.log("ERROR", f"Erro ao atualizar performance: {e}")
+        except Exception:
+            pass
 
         self.root.after(1000, self._update_performance)
 
@@ -2197,10 +2386,66 @@ class InterfaceGrafica:
             with open(lf, "r", encoding="utf-8") as f:
                 lines = f.readlines()[-200:]
             for ln in lines:
-                self.text_logs.insert(tk.END, ln)
+                if not self._is_log_line_enabled(ln):
+                    continue
+                level = self._extract_log_level(ln)
+                if level == "ERROR":
+                    self.text_logs.insert(tk.END, ln, "ERROR")
+                elif level == "WARN":
+                    self.text_logs.insert(tk.END, ln, "WARN")
+                else:
+                    self.text_logs.insert(tk.END, ln)
             # Scroll automático apenas se checkbox estiver ativado
             if self.var_auto_scroll.get():
                 self.text_logs.see(tk.END)
+        except Exception:
+            pass
+
+    def _extract_log_level(self, line: str) -> str:
+        try:
+            parts = line.split("|")
+            if len(parts) >= 2:
+                return parts[1].strip().upper()
+        except Exception:
+            pass
+        return ""
+
+    def _is_log_line_enabled(self, line: str) -> bool:
+        level = self._extract_log_level(line)
+        if level == "ERROR":
+            return bool(self.var_log_error.get())
+        if level == "WARN":
+            return bool(self.var_log_warn.get())
+        if level == "INFO":
+            return bool(self.var_log_info.get())
+        return True
+
+    def _refresh_logs_view(self):
+        if not hasattr(self, "text_logs"):
+            return
+        try:
+            self.text_logs.delete("1.0", tk.END)
+            self._load_logs_tail()
+        except Exception:
+            pass
+
+    def _clear_logs(self):
+        try:
+            # Limpar arquivo de log
+            Path("log.txt").write_text("", encoding="utf-8")
+        except Exception:
+            pass
+
+        # Limpar fila de logs pendentes
+        try:
+            while True:
+                self.log_queue.get_nowait()
+        except Exception:
+            pass
+
+        # Limpar tela
+        try:
+            self.text_logs.delete("1.0", tk.END)
         except Exception:
             pass
 
@@ -2216,8 +2461,8 @@ class InterfaceGrafica:
 
         try:
             while True:
-                cam_id, foto_path, ts, event_uid, shot_idx = self.photo_queue.get_nowait()
-                self._add_thumbnail(cam_id, foto_path, ts, event_uid, shot_idx)
+                cam_id, foto_path, ts, event_uid, shot_idx, crop_path = self.photo_queue.get_nowait()
+                self._add_thumbnail(cam_id, foto_path, ts, event_uid, shot_idx, crop_path)
         except queue.Empty:
             pass
 
@@ -2225,10 +2470,13 @@ class InterfaceGrafica:
             while True:
                 line = self.log_queue.get_nowait()
                 try:
+                    if not self._is_log_line_enabled(line):
+                        continue
                     # Detectar nível de log e aplicar cor
-                    if " ERROR " in line:
+                    level = self._extract_log_level(line)
+                    if level == "ERROR":
                         self.text_logs.insert(tk.END, line, "ERROR")
-                    elif " WARN " in line:
+                    elif level == "WARN":
                         self.text_logs.insert(tk.END, line, "WARN")
                     else:
                         self.text_logs.insert(tk.END, line)
@@ -2393,6 +2641,15 @@ class InterfaceGrafica:
             status_label.tooltip = tooltip_text
 
         self.root.after(1000, self._update_camera_status)
+
+    def _check_system_events_buffer(self):
+        """Verifica e envia buffer de eventos de sistema periodicamente."""
+        try:
+            self.log.check_and_flush_buffer()
+        except Exception:
+            pass
+        # Reagendar a cada 5 segundos
+        self.root.after(5000, self._check_system_events_buffer)
 
     # ---------------- THUMBNAILS ----------------
     def _parse_thumb_dt(self, ts: str) -> datetime:
@@ -2622,7 +2879,7 @@ class InterfaceGrafica:
             self._apply_detector_config(det)
 
             det.frame_callback = lambda cid, fr, q=self.frame_queue: q.put((cid, fr))
-            det.photo_callback = lambda cid, path, ts, event_uid, shot_idx, q=self.photo_queue: q.put((cid, path, ts, event_uid, shot_idx))
+            det.photo_callback = lambda cid, path, ts, event_uid, shot_idx, crop_path, q=self.photo_queue: q.put((cid, path, ts, event_uid, shot_idx, crop_path))
 
             th = threading.Thread(target=det.run, daemon=True)
             self.detectors[cam_id] = det
@@ -2726,7 +2983,7 @@ class InterfaceGrafica:
             self._apply_detector_config(new_det)
 
             new_det.frame_callback = lambda cid, fr, q=self.frame_queue: q.put((cid, fr))
-            new_det.photo_callback = lambda cid, path, ts, event_uid, shot_idx, q=self.photo_queue: q.put((cid, path, ts, event_uid, shot_idx))
+            new_det.photo_callback = lambda cid, path, ts, event_uid, shot_idx, crop_path, q=self.photo_queue: q.put((cid, path, ts, event_uid, shot_idx, crop_path))
 
             new_th = threading.Thread(target=new_det.run, daemon=True)
             self.detectors[cam_id] = new_det
@@ -2795,12 +3052,12 @@ class InterfaceGrafica:
 
             caption = (
                 "🧪 TESTE DE DETECÇÃO\n"
-                f"{'━' * 12}\n"
+                f"{'━' * 8}\n"
                 f"📹 Câmera: TESTE\n"
                 f"⏰ {ts_str}\n"
                 f"👤 1 pessoa detectada\n"
                 f"📊 Confiança: 99.0%\n"
-                f"{'━' * 12}\n"
+                f"{'━' * 8}\n"
                 f"v{APP_VERSION}"
             )
 

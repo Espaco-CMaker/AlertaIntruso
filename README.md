@@ -1,6 +1,6 @@
 # AlertaIntruso - Sistema de Alarme Inteligente por Visão Computacional
 
-**Versão Atual Baseada na: 3.9.5** (01/01/2026)
+**Versão Atual Baseada na: 4.5.5** (04/02/2026)
 
 ## Descrição Geral
 
@@ -53,6 +53,7 @@ O **AlertaIntruso** é uma aplicação desktop em Python desenvolvida para monit
 - Tempo real
 - Histórico local
 - Rotação automática
+- Filtros por nível (INFO/WARN/ERROR)
 
 ### Performance
 - Tabela profissional em tempo real com métricas por câmera
@@ -95,14 +96,14 @@ Edite `config.ini`:
 
 ## Logs e Monitoramento
 
-- **log.txt**: Logs rotativos (1MB, backup automático)
+- **log.txt**: Logs rotativos (5MB, backup automático)
 - **fotos/**: Evidências por evento (EVENT_UID)
 - **models/**: YOLOv4-tiny (baixado automaticamente)
 
 ## Desenvolvimento
 
-- **Versão**: 3.9.3
-- **Data**: 01/01/2026
+- **Versão**: 4.5.5
+- **Data**: 04/02/2026
 - **Autor**: Fabio Bettio
 - **Licença**: Uso educacional/experimental
 

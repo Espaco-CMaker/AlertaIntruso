@@ -1,51 +1,48 @@
-# AlertaIntruso v4.3.16 - Status Report
+# AlertaIntruso v4.5.5 - Status Report
 
-**Data**: 02/02/2026  
-**Versão**: 4.3.16  
+**Data**: 04/02/2026  
+**Versão**: 4.5.5  
 **Status**: ✅ ESTÁVEL
 
 ## Sessão de Desenvolvimento
 
 ### Período
-02/02/2026 - v4.2.4 → v4.3.16 (14 versões em uma sessão)
+04/02/2026 - v4.3.16 → v4.5.5 (padronização + aceite)
 
 ### Objetivos Alcançados
 
-#### 1️⃣ Telegram Improvements (v4.3.0-4.3.3)
-- ✅ NetworkMonitor com captura RTP real
-- ✅ Detecção com métricas de qualidade
-- ✅ Mensagens amigáveis de início/parada
-- ✅ Formato compacto com emojis
+#### 1️⃣ Telegram Improvements
+- ✅ Envio de fotos em grupo (sendMediaGroup)
+- ✅ Mensagens compactas com separadores menores
+- ✅ Watchdog e WARN não enviados ao Telegram
 
-#### 2️⃣ GUI Enhancements (v4.3.4-4.3.5)
+#### 2️⃣ GUI Enhancements
 - ✅ Auto-scroll checkbox na aba Logs
-- ✅ Camera frames vazios ao desconectar
+- ✅ Filtros INFO/WARN/ERROR na aba Logs
+- ✅ Botão “Limpar Logs” apaga histórico
 
-#### 3️⃣ Telegram Validation (v4.3.6)
+#### 3️⃣ Telegram Validation
 - ✅ Botão "Testar envio" com simulação de detecção
 
-#### 4️⃣ Critical Alerts (v4.3.7)
+#### 4️⃣ Critical Alerts
 - ✅ LogManager detecta padrões críticos
-- ✅ Erros encaminhados automaticamente para Telegram
+- ✅ STDERR classificado como ERROR
 
-#### 5️⃣ Message Optimization (v4.3.8-4.3.9)
-- ✅ 1 decimal precision para floats
+#### 5️⃣ Message Optimization
 - ✅ Nomes de classes inclusos
-- ✅ Removed log spam ("MOVIMENTO SEM PESSOA")
+- ✅ Logs reduzidos e com filtro por nível
 
-#### 6️⃣ RTSP Reliability (v4.3.10-4.3.11)
+#### 6️⃣ RTSP Reliability
 - ✅ Timeout aumentado para 10s
 - ✅ Buffer flush após reconnect
 - ✅ Backoff otimizado (5s-30s)
-- ✅ Fix: CAM3 reconnection cycle
 
-#### 7️⃣ GUI Layout (v4.3.12-4.3.15)
+#### 7️⃣ GUI Layout
 - ✅ Scroll na aba Config
 - ✅ Botões fixos na base
 - ✅ Conteúdo visível
-- ✅ Label melhorado
 
-#### 8️⃣ Performance Metrics (v4.3.16)
+#### 8️⃣ Performance Metrics
 - ✅ Fallback para bitrate interno
 - ✅ Todas as métricas visíveis
 
@@ -77,7 +74,7 @@
 ✅ Network monitoring (bitrate, latency, jitter, ping, loss)  
 ✅ Performance metrics (FPS, CPU, RAM, GPU info)  
 ✅ Auto-recovery (soft/hard restart)  
-✅ Log rotation (1MB + backup)  
+✅ Log rotation (5MB + backup)  
 ✅ Config persistence (config.ini)  
 ✅ Photo thumbnails (event grouping)  
 ✅ Mouse wheel scrolling  
