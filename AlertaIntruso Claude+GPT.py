@@ -4,7 +4,7 @@ ALERTAINTRUSO — ALARME INTELIGENTE POR VISÃO COMPUTACIONAL (RTSP • YOLO •
 ================================================================================
 Arquivo:        AlertaIntruso Claude+GPT.py
 Projeto:        Sistema de Alarme Inteligente por Visão Computacional
-Versão:         4.4.0
+Versão:         4.5.0
 Data:           04/02/2026
 Autor:          Fabio Bettio
 Licença:        Uso educacional / experimental
@@ -22,6 +22,17 @@ de movimento.
 ================================================================================
 Changelog completo
 ================================================================================
+
+v4.5.0 (04/02/2026) [FEATURE + FIX - LOGS E GESTÃO DE FOTOS] (linhas: 98)
+    - NOVO: Limpeza automática de fotos antigas (manter apenas últimas X fotos)
+    - NOVO: Configuração max_photos_keep na aba Config (padrão: 500)
+    - NOVO: Função _cleanup_old_photos() chamada antes de salvar nova foto
+    - MELHORIA: Logs de erro detalhados para Telegram (HTTP status, tipo erro, arquivo)
+    - MELHORIA: Erros de Telegram agora são ERROR (não WARN)
+    - DETALHAMENTO: Timeout, ConnectionError, FileNotFoundError com contexto completo
+    - TELEGRAM: Logs incluem URL, ChatID, tamanho arquivo, resposta API
+    - PERSISTÊNCIA: Tabela de fotos agora limitada ao máximo configurado
+    - CONFIG.INI: Novo parâmetro max_photos_keep na seção [DETECTOR]
 
 v4.4.0 (04/02/2026) [FEATURE - NOVA FUNCIONALIDADE] (linhas: 42)
     - NOVO: Salvar crop do objeto detectado em cada foto
@@ -180,7 +191,7 @@ def set_ffmpeg_capture_options(transport: str = "udp") -> None:
 
 set_ffmpeg_capture_options("udp")
 
-APP_VERSION = "4.4.0"
+APP_VERSION = "4.5.0"
 MAX_THUMBS = 200
 
 # ----------------------------- Tips do Menu de Configurações -----------------------------
@@ -192,6 +203,7 @@ CONFIGURATION_TIPS = {
     "nms": "Supressão de não-máxima: quanto menor, mais detecções (0.2 = muitas, 0.95 = poucas)",
     "photos": "Quantidade de fotos capturadas por evento de detecção",
     "min_capture": "Intervalo mínimo (segundos) entre cada foto capturada em um evento",
+    "max_photos": "Número máximo de fotos (geral + crop) mantidas no diretório. Fotos mais antigas são excluídas automaticamente.",
     "person": "Disparar alerta quando pessoa é detectada",
     "car": "Disparar alerta quando carro é detectado",
     "bus": "Disparar alerta quando ônibus é detectado",
@@ -429,10 +441,42 @@ class TelegramBot:
             url = f"{self.base_url}/sendMessage"
             data = {"chat_id": self.chat_id, "text": texto}
             r = requests.post(url, data=data, timeout=10)
-            return r.status_code == 200
+            if r.status_code == 200:
+                return True
+            else:
+                # ERROR: resposta HTTP não-200
+                if self.log:
+                    self.log.log("ERROR", 
+                        f"Telegram sendMessage FALHOU | "
+                        f"HTTP {r.status_code} | "
+                        f"Resposta: {r.text[:200]} | "
+                        f"URL: {url} | "
+                        f"ChatID: {self.chat_id}")
+                return False
+        except requests.exceptions.Timeout as e:
+            if self.log:
+                self.log.log("ERROR", 
+                    f"Telegram sendMessage TIMEOUT | "
+                    f"Erro: {str(e)} | "
+                    f"URL: {url} | "
+                    f"ChatID: {self.chat_id}")
+            return False
+        except requests.exceptions.ConnectionError as e:
+            if self.log:
+                self.log.log("ERROR", 
+                    f"Telegram sendMessage CONEXÃO FALHOU | "
+                    f"Erro: {str(e)} | "
+                    f"URL: {url} | "
+                    f"ChatID: {self.chat_id}")
+            return False
         except Exception as e:
             if self.log:
-                self.log.log("ERROR", f"Erro ao enviar mensagem Telegram: {e}")
+                self.log.log("ERROR", 
+                    f"Telegram sendMessage EXCEÇÃO | "
+                    f"Tipo: {type(e).__name__} | "
+                    f"Erro: {str(e)} | "
+                    f"URL: {url} | "
+                    f"ChatID: {self.chat_id}")
             return False
 
     def enviar_foto(self, foto_path: str, caption: str = "") -> bool:
@@ -444,10 +488,54 @@ class TelegramBot:
                 files = {"photo": photo}
                 data = {"chat_id": self.chat_id, "caption": caption}
                 r = requests.post(url, files=files, data=data, timeout=30)
-            return r.status_code == 200
+            if r.status_code == 200:
+                return True
+            else:
+                # ERROR: resposta HTTP não-200
+                if self.log:
+                    self.log.log("ERROR", 
+                        f"Telegram sendPhoto FALHOU | "
+                        f"HTTP {r.status_code} | "
+                        f"Resposta: {r.text[:200]} | "
+                        f"Arquivo: {foto_path} | "
+                        f"Tamanho: {Path(foto_path).stat().st_size / 1024:.1f}KB | "
+                        f"URL: {url} | "
+                        f"ChatID: {self.chat_id}")
+                return False
+        except FileNotFoundError as e:
+            if self.log:
+                self.log.log("ERROR", 
+                    f"Telegram sendPhoto ARQUIVO NÃO ENCONTRADO | "
+                    f"Erro: {str(e)} | "
+                    f"Arquivo: {foto_path}")
+            return False
+        except requests.exceptions.Timeout as e:
+            if self.log:
+                self.log.log("ERROR", 
+                    f"Telegram sendPhoto TIMEOUT | "
+                    f"Erro: {str(e)} | "
+                    f"Arquivo: {foto_path} | "
+                    f"URL: {url} | "
+                    f"ChatID: {self.chat_id}")
+            return False
+        except requests.exceptions.ConnectionError as e:
+            if self.log:
+                self.log.log("ERROR", 
+                    f"Telegram sendPhoto CONEXÃO FALHOU | "
+                    f"Erro: {str(e)} | "
+                    f"Arquivo: {foto_path} | "
+                    f"URL: {url} | "
+                    f"ChatID: {self.chat_id}")
+            return False
         except Exception as e:
             if self.log:
-                self.log.log("ERROR", f"Erro ao enviar foto Telegram: {e}")
+                self.log.log("ERROR", 
+                    f"Telegram sendPhoto EXCEÇÃO | "
+                    f"Tipo: {type(e).__name__} | "
+                    f"Erro: {str(e)} | "
+                    f"Arquivo: {foto_path} | "
+                    f"URL: {url} | "
+                    f"ChatID: {self.chat_id}")
             return False
 
     def formatar_msg_inicio(self, cameras_ativas: int, versao: str) -> str:
@@ -534,6 +622,7 @@ class RTSPObjectDetector:
         self.input_size = 416
         self.telegram_mode = "detections"  # all | detections | none
         self.photos_per_event = 2
+        self.max_photos_keep = 500  # Número máximo de fotos a manter
         
         # OTIMIZAÇÃO: Skip frames para reduzir carga de processamento
         # skip_frames=2 significa processar 1 frame a cada 3 (pula 2)
@@ -798,11 +887,46 @@ class RTSPObjectDetector:
         crop = frame_bgr[y1:y2, x1:x2]
         return crop if crop.size > 0 else None
 
+    def _cleanup_old_photos(self):
+        """Remove fotos antigas mantendo apenas as últimas max_photos_keep."""
+        try:
+            # Listar todas as fotos no diretório (incluindo crops)
+            all_photos = sorted(self.foto_dir.glob("*.jpg"), key=lambda p: p.stat().st_mtime, reverse=True)
+            
+            if len(all_photos) <= self.max_photos_keep:
+                return  # Não precisa limpar
+            
+            # Remover fotos mais antigas
+            photos_to_remove = all_photos[self.max_photos_keep:]
+            removed_count = 0
+            
+            for photo in photos_to_remove:
+                try:
+                    photo.unlink()
+                    removed_count += 1
+                except Exception as e:
+                    self.log.log("WARN", f"Erro ao remover foto antiga {photo.name}: {e}", self.cam_id)
+            
+            if removed_count > 0:
+                self.log.log("INFO", 
+                    f"Limpeza automática | Removidas {removed_count} fotos antigas | "
+                    f"Mantidas {len(all_photos) - removed_count}/{self.max_photos_keep} | "
+                    f"v{APP_VERSION}", self.cam_id)
+        
+        except Exception as e:
+            self.log.log("ERROR", 
+                f"Erro na limpeza automática de fotos | "
+                f"Tipo: {type(e).__name__} | "
+                f"Erro: {str(e)}", self.cam_id)
+
     def _save_and_notify(self, frame_bgr_with_boxes, frame_bgr_clean, boxes, event_uid: str, shot_idx: int, person_count: int, conf_avg: float, detected_classes=None):
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         safe_uid = (event_uid or "evt").replace(":", "-").replace("/", "-")
         filename = f"{ts}_CAM{self.cam_id}_EVT{safe_uid}_S{shot_idx}.jpg"
         filename_crop = f"{ts}_CAM{self.cam_id}_EVT{safe_uid}_S{shot_idx}_crop.jpg"
+
+        # Limpar fotos antigas se necessário (manter apenas max_photos_keep)
+        self._cleanup_old_photos()
 
         # Salvar foto geral (com boxes)
         path = self.foto_dir / filename
@@ -876,7 +1000,7 @@ class RTSPObjectDetector:
             if ok:
                 self.log.log("INFO", "Foto geral enviada Telegram.", self.cam_id)
             else:
-                self.log.log("WARN", "Falha ao enviar foto geral Telegram.", self.cam_id)
+                self.log.log("ERROR", "Falha ao enviar foto geral Telegram.", self.cam_id)
             
             # Enviar foto crop se disponível
             if crop is not None:
@@ -885,7 +1009,7 @@ class RTSPObjectDetector:
                 if ok_crop:
                     self.log.log("INFO", "Foto crop enviada Telegram.", self.cam_id)
                 else:
-                    self.log.log("WARN", "Falha ao enviar foto crop Telegram.", self.cam_id)
+                    self.log.log("ERROR", "Falha ao enviar foto crop Telegram.", self.cam_id)
 
     # -------- Soft reconnect (watchdog) --------
     def request_soft_reconnect(self, reason: str = "watchdog"):
@@ -1412,6 +1536,7 @@ class InterfaceGrafica:
         self.config["DETECTOR"]["photos_per_event"] = self.sp_photos.get().strip()
         self.config["DETECTOR"]["min_capture_interval_s"] = self.sp_min_capture.get().strip()
         self.config["DETECTOR"]["rtsp_transport"] = self.cb_rtsp_transport.get().strip().lower()
+        self.config["DETECTOR"]["max_photos_keep"] = self.sp_max_photos.get().strip()
 
         enabled = []
         if self.var_person.get(): enabled.append("person")
@@ -1667,6 +1792,14 @@ class InterfaceGrafica:
         self.cb_rtsp_transport.set(self.config["DETECTOR"].get("rtsp_transport", "udp").lower())
         self._add_tooltip_to_widget(lbl_transport, CONFIGURATION_TIPS["rtsp_transport"])
         self._add_tooltip_to_widget(self.cb_rtsp_transport, CONFIGURATION_TIPS["rtsp_transport"])
+
+        lbl_max_photos = ttk.Label(det, text="Máx. fotos manter:")
+        lbl_max_photos.grid(row=1, column=4, sticky="w")
+        self.sp_max_photos = ttk.Spinbox(det, from_=50, to=2000, increment=50, width=8)
+        self.sp_max_photos.grid(row=1, column=5, padx=6, pady=4, sticky="w")
+        self.sp_max_photos.set(self.config["DETECTOR"].get("max_photos_keep", "500"))
+        self._add_tooltip_to_widget(lbl_max_photos, CONFIGURATION_TIPS["max_photos"])
+        self._add_tooltip_to_widget(self.sp_max_photos, CONFIGURATION_TIPS["max_photos"])
 
         # ========== CLASSES ==========
         cls = ttk.LabelFrame(wrap, text="Classes (somente pessoa dispara alerta)", padding=10)
@@ -2372,6 +2505,7 @@ class InterfaceGrafica:
         det.min_capture_interval_s = float(self.config["DETECTOR"].get("min_capture_interval_s", "1.0"))
         det.skip_frames = int(self.config["DETECTOR"].get("skip_frames", "2"))
         det.input_size = int(self.config["DETECTOR"].get("input_size", "320"))
+        det.max_photos_keep = int(self.config["DETECTOR"].get("max_photos_keep", "500"))
 
         name_to_id = {
             "person": 0, "bicycle": 1, "car": 2, "motorcycle": 3,
