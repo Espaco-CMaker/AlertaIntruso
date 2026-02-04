@@ -4,8 +4,8 @@ ALERTAINTRUSO — ALARME INTELIGENTE POR VISÃO COMPUTACIONAL (RTSP • YOLO •
 ================================================================================
 Arquivo:        AlertaIntruso Claude+GPT.py
 Projeto:        Sistema de Alarme Inteligente por Visão Computacional
-Versão:         4.3.20
-Data:           03/02/2026
+Versão:         4.4.0
+Data:           04/02/2026
 Autor:          Fabio Bettio
 Licença:        Uso educacional / experimental
 Status:         ESTÁVEL
@@ -22,6 +22,17 @@ de movimento.
 ================================================================================
 Changelog completo
 ================================================================================
+
+v4.4.0 (04/02/2026) [FEATURE - NOVA FUNCIONALIDADE] (linhas: 42)
+    - NOVO: Salvar crop do objeto detectado em cada foto
+    - NOVO: Enviar foto crop para Telegram junto com foto geral
+    - NOVO: Exibir crop ao lado da foto geral na aba de fotos
+    - NOVO: Linha separadora preta (3px) entre dias diferentes na aba de fotos
+    - IMPLEMENTAÇÃO: Função _extract_object_crop com margem de 15%
+    - MELHORIA: Callback de foto agora inclui path do crop (crop_path)
+    - MELHORIA: Layout da aba de fotos com duas colunas (geral + crop)
+    - RESULTADO: Cada deteção gera 2 fotos persistidas e exibidas
+    - TELEGRAM: Foto crop enviada com prefixo "🔍 ZOOM -"
 
 v4.3.20 (03/02/2026) [BUG FIX - CRÍTICO] (linhas: 1)
     - FIX CRÍTICO: Corrigido bug da "última foto sem objetos detectados"
@@ -169,7 +180,7 @@ def set_ffmpeg_capture_options(transport: str = "udp") -> None:
 
 set_ffmpeg_capture_options("udp")
 
-APP_VERSION = "4.3.20"
+APP_VERSION = "4.4.0"
 MAX_THUMBS = 200
 
 # ----------------------------- Tips do Menu de Configurações -----------------------------
@@ -764,26 +775,58 @@ class RTSPObjectDetector:
     def _person_present(self, cids) -> bool:
         return 0 in cids  # COCO: person=0
 
-    def _save_and_notify(self, frame_bgr_with_boxes, event_uid: str, shot_idx: int, person_count: int, conf_avg: float, detected_classes=None):
+    def _extract_object_crop(self, frame_bgr, boxes, margin_percent=15):
+        """Extrai crop do maior objeto detectado com margem de 15%."""
+        if not boxes:
+            return None
+        
+        # Pegar a maior caixa (área)
+        largest_box = max(boxes, key=lambda b: b[2] * b[3])
+        x, y, w, h = largest_box
+        
+        # Adicionar margem de 15%
+        margin_w = int(w * margin_percent / 100)
+        margin_h = int(h * margin_percent / 100)
+        
+        # Calcular novas coordenadas com margem
+        x1 = max(0, x - margin_w)
+        y1 = max(0, y - margin_h)
+        x2 = min(frame_bgr.shape[1], x + w + margin_w)
+        y2 = min(frame_bgr.shape[0], y + h + margin_h)
+        
+        # Extrair crop
+        crop = frame_bgr[y1:y2, x1:x2]
+        return crop if crop.size > 0 else None
+
+    def _save_and_notify(self, frame_bgr_with_boxes, frame_bgr_clean, boxes, event_uid: str, shot_idx: int, person_count: int, conf_avg: float, detected_classes=None):
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         safe_uid = (event_uid or "evt").replace(":", "-").replace("/", "-")
         filename = f"{ts}_CAM{self.cam_id}_EVT{safe_uid}_S{shot_idx}.jpg"
+        filename_crop = f"{ts}_CAM{self.cam_id}_EVT{safe_uid}_S{shot_idx}_crop.jpg"
 
+        # Salvar foto geral (com boxes)
         path = self.foto_dir / filename
         cv2.imwrite(str(path), frame_bgr_with_boxes)
+        
+        # Extrair e salvar crop do objeto detectado
+        path_crop = self.foto_dir / filename_crop
+        crop = self._extract_object_crop(frame_bgr_clean, boxes)
+        if crop is not None:
+            cv2.imwrite(str(path_crop), crop)
 
         self.log.log(
             "INFO",
             "SHOT | "
             f"evt={event_uid} | shot={shot_idx}/{self.photos_per_event} | "
             f"pessoas={person_count} | conf_avg={conf_avg:.2f} | "
-            f"arquivo={filename} | v{APP_VERSION}",
+            f"arquivo={filename} | crop={filename_crop if crop is not None else 'N/A'} | v{APP_VERSION}",
             self.cam_id
         )
 
         if self.photo_callback:
             try:
-                self.photo_callback(self.cam_id, str(path), ts, event_uid, shot_idx)
+                crop_path = str(path_crop) if crop is not None else None
+                self.photo_callback(self.cam_id, str(path), ts, event_uid, shot_idx, crop_path)
             except Exception as e:
                 self.log.log("ERROR", f"Erro no callback de foto: {e}", self.cam_id)
 
@@ -828,11 +871,21 @@ class RTSPObjectDetector:
                 f"v{APP_VERSION}"
             )
             
+            # Enviar foto geral
             ok = self.telegram.enviar_foto(str(path), caption)
             if ok:
-                self.log.log("INFO", "Foto enviada Telegram.", self.cam_id)
+                self.log.log("INFO", "Foto geral enviada Telegram.", self.cam_id)
             else:
-                self.log.log("WARN", "Falha ao enviar foto Telegram.", self.cam_id)
+                self.log.log("WARN", "Falha ao enviar foto geral Telegram.", self.cam_id)
+            
+            # Enviar foto crop se disponível
+            if crop is not None:
+                caption_crop = f"🔍 ZOOM - {caption.split(chr(10))[0]}\n{chr(10).join(caption.split(chr(10))[1:])}"
+                ok_crop = self.telegram.enviar_foto(str(path_crop), caption_crop)
+                if ok_crop:
+                    self.log.log("INFO", "Foto crop enviada Telegram.", self.cam_id)
+                else:
+                    self.log.log("WARN", "Falha ao enviar foto crop Telegram.", self.cam_id)
 
     # -------- Soft reconnect (watchdog) --------
     def request_soft_reconnect(self, reason: str = "watchdog"):
@@ -1016,7 +1069,7 @@ class RTSPObjectDetector:
                                 if self.classes and cid < len(self.classes):
                                     detected_class_names.append(self.classes[cid])
 
-                            self._save_and_notify(frame_draw, self._event_uid, shot_idx, person_count, conf_avg, detected_class_names)
+                            self._save_and_notify(frame_draw, frame, boxes, self._event_uid, shot_idx, person_count, conf_avg, detected_class_names)
 
                             self._pending_shots -= 1
                             self._last_shot_time = now_mono
@@ -2189,6 +2242,7 @@ class InterfaceGrafica:
         if not hasattr(self, "thumb_groups_by_uid"):
             self.thumb_groups_by_uid = {}
             self.thumb_groups_order = []
+            self.last_day_shown = None
 
         uid = (event_uid or "evt")
         if uid in self.thumb_groups_by_uid:
@@ -2196,8 +2250,27 @@ class InterfaceGrafica:
             g["last_dt"] = dt
             return g
 
+        # Verificar se é um novo dia para adicionar separador
+        current_day = dt.date()
+        if self.last_day_shown is not None and current_day != self.last_day_shown:
+            # Adicionar linha separadora entre dias
+            row = 0
+            separator = tk.Frame(self.photos_wrap, height=3, bg="black")
+            separator.grid(row=row, column=0, sticky="ew", padx=0, pady=5)
+            
+            # Deslocar todos os grupos existentes
+            for other_uid in self.thumb_groups_order:
+                g_existing = self.thumb_groups_by_uid[other_uid]
+                g_existing["row"] += 1
+                g_existing["thumbs_frame"].master.grid(row=g_existing["row"], column=0, sticky="w", padx=8, pady=10)
+            
+            row = 1
+        else:
+            row = 0
+        
+        self.last_day_shown = current_day
+        
         # Inserir novo grupo no INÍCIO (fotos mais novas primeiro)
-        row = 0
         self.thumb_groups_order.insert(0, uid)
         
         # Atualizar row de todos os grupos existentes (deslocar para baixo)
@@ -2222,24 +2295,40 @@ class InterfaceGrafica:
         self.thumb_groups_by_uid[uid] = g
         return g
 
-    def _add_thumbnail(self, cam_id: int, foto_path: str, ts: str, event_uid: str, shot_idx: int):
+    def _add_thumbnail(self, cam_id: int, foto_path: str, ts: str, event_uid: str, shot_idx: int, crop_path: str = None):
         try:
             dt = self._parse_thumb_dt(ts)
             group = self._get_or_create_group_by_uid(event_uid, dt)
 
+            # Criar célula para as imagens
+            col = int(group["next_col"])
+            cell = ttk.Frame(group["thumbs_frame"])
+            cell.grid(row=0, column=col, padx=8, pady=6, sticky="w")
+
+            # Frame para as duas imagens (geral e crop) lado a lado
+            images_frame = ttk.Frame(cell)
+            images_frame.pack()
+
+            # Imagem geral
             img = Image.open(foto_path)
             img.thumbnail((220, 160))
             imgtk = ImageTk.PhotoImage(img)
 
-            col = int(group["next_col"])
-
-            cell = ttk.Frame(group["thumbs_frame"])
-            cell.grid(row=0, column=col, padx=8, pady=6, sticky="w")
-
-            img_label = tk.Label(cell, image=imgtk, cursor="hand2")
+            img_label = tk.Label(images_frame, image=imgtk, cursor="hand2")
             img_label.image = imgtk
-            img_label.pack()
+            img_label.grid(row=0, column=0, padx=2)
             img_label.bind("<Button-1>", lambda e, p=foto_path: self._open_photo(p))
+
+            # Imagem crop (se disponível)
+            if crop_path and Path(crop_path).exists():
+                img_crop = Image.open(crop_path)
+                img_crop.thumbnail((110, 160))
+                imgtk_crop = ImageTk.PhotoImage(img_crop)
+
+                img_crop_label = tk.Label(images_frame, image=imgtk_crop, cursor="hand2")
+                img_crop_label.image = imgtk_crop
+                img_crop_label.grid(row=0, column=1, padx=2)
+                img_crop_label.bind("<Button-1>", lambda e, p=crop_path: self._open_photo(p))
 
             ttk.Label(cell, text=f"CAM{cam_id} • S{shot_idx} • {dt.strftime('%H:%M:%S')}", font=("Arial", 9)).pack(pady=(4, 0))
 
