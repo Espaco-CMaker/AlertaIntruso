@@ -4,7 +4,7 @@ ALERTAINTRUSO — ALARME INTELIGENTE POR VISÃO COMPUTACIONAL (RTSP • YOLO •
 ================================================================================
 Arquivo:        AlertaIntruso Claude+GPT.py
 Projeto:        Sistema de Alarme Inteligente por Visão Computacional
-Versão:         4.5.0
+Versão:         4.5.1
 Data:           04/02/2026
 Autor:          Fabio Bettio
 Licença:        Uso educacional / experimental
@@ -22,6 +22,9 @@ de movimento.
 ================================================================================
 Changelog completo
 ================================================================================
+
+v4.5.1 (04/02/2026) [BUILD] (linhas: 0)
+    - Incremento de versão para gerar novo executável
 
 v4.5.0 (04/02/2026) [FEATURE + FIX - LOGS E GESTÃO DE FOTOS] (linhas: 98)
     - NOVO: Limpeza automática de fotos antigas (manter apenas últimas X fotos)
@@ -192,7 +195,7 @@ def set_ffmpeg_capture_options(transport: str = "udp") -> None:
 
 set_ffmpeg_capture_options("udp")
 
-APP_VERSION = "4.5.0"
+APP_VERSION = "4.5.1"
 MAX_THUMBS = 200
 
 # ----------------------------- Tips do Menu de Configurações -----------------------------
