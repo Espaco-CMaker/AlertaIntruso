@@ -1,5 +1,13 @@
 # CHANGELOG - AlertaIntruso
 
+## v4.5.7 (10/02/2026)
+### ✅ Correções e Melhorias de UX
+- **FIX**: Scroll do mouse habilitado na aba Fotos (MouseWheel binding)
+- **FIX**: Filtros de log corrigidos (linhas sem nível tratadas como INFO)
+- **FIX**: Evento movimento agora é INFO (não WARN)
+- **FIX**: Linha divisória entre dias corrigida (horizontal, posicionamento correto)
+- **NOVO**: Fotos persistentes ao reiniciar aplicação (carrega do diretório)
+
 ## v4.5.6 (04/02/2026)
 ### ✅ Validação Final
 - **VALIDADO**: Controle de qualidade JPEG configurável (50-100) na aba Config

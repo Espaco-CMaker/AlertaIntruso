@@ -4,8 +4,8 @@ ALERTAINTRUSO — ALARME INTELIGENTE POR VISÃO COMPUTACIONAL (RTSP • YOLO •
 ================================================================================
 Arquivo:        AlertaIntruso Claude+GPT.py
 Projeto:        Sistema de Alarme Inteligente por Visão Computacional
-Versão:         4.5.6
-Data:           04/02/2026
+Versão:         4.5.7
+Data:           10/02/2026
 Autor:          Fabio Bettio
 Licença:        Uso educacional / experimental
 Status:         ESTÁVEL
@@ -22,6 +22,13 @@ de movimento.
 ================================================================================
 Changelog completo
 ================================================================================
+
+v4.5.7 (10/02/2026) [CORREÇÕES UX] (linhas: 0)
+    - FIX: Scroll do mouse habilitado na aba Fotos
+    - FIX: Filtros de log corrigidos (linhas sem nível = INFO)
+    - FIX: Evento movimento como INFO (não WARN)
+    - FIX: Linha divisória entre dias corrigida
+    - NOVO: Fotos persistentes ao reiniciar
 
 v4.5.6 (04/02/2026) [VALIDAÇÃO FINAL] (linhas: 0)
     - VALIDADO: Controle de qualidade JPEG configurável (50-100) na aba Config
@@ -1356,7 +1363,7 @@ class RTSPObjectDetector:
                         total_boxes = len(boxes)
 
                         self.log.log(
-                            "WARN",
+                            "INFO",
                             "EVENTO MOVIMENTO/DETECCAO | "
                             f"evt={self._event_uid} | pessoas={person_count} | boxes={total_boxes} | "
                             f"conf_avg={conf_avg:.2f} | conf_max={best_conf:.2f} | "
@@ -1623,6 +1630,7 @@ class InterfaceGrafica:
         self.frame_fotos = ttk.Frame(self.notebook)
         self.notebook.add(self.frame_fotos, text="Fotos")
         self._build_photos_tab()
+        self._load_existing_photos()  # Carregar fotos já salvas
 
         self.frame_logs = ttk.Frame(self.notebook)
         self.notebook.add(self.frame_logs, text="Logs")
@@ -2170,10 +2178,62 @@ class InterfaceGrafica:
         self.photos_canvas.create_window((0, 0), window=self.photos_wrap, anchor="nw")
         self.photos_canvas.configure(yscrollcommand=self.photos_scroll.set)
 
+        # Habilitar scroll com mouse wheel
+        def _on_mousewheel(event):
+            self.photos_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+        
+        self.photos_canvas.bind_all("<MouseWheel>", _on_mousewheel)
+
         self.photos_canvas.pack(side="left", fill="both", expand=True)
         self.photos_scroll.pack(side="right", fill="y")
 
         self.thumb_items = []
+
+    def _load_existing_photos(self):
+        """Carrega fotos existentes do diretório ao iniciar."""
+        try:
+            foto_dir = Path("fotos")
+            if not foto_dir.exists():
+                return
+            
+            # Buscar todas as fotos (exceto crops)
+            photos = sorted(foto_dir.glob("*_CAM*_EVT*_S*.jpg"), key=lambda p: p.stat().st_mtime, reverse=True)
+            
+            # Filtrar apenas fotos principais (não crops)
+            main_photos = [p for p in photos if not p.name.endswith("_crop.jpg")]
+            
+            # Carregar fotos na interface
+            for photo_path in main_photos:
+                try:
+                    # Parse do filename: YYYYMMDD_HHMMSS_CAMX_EVTXXX_SX.jpg
+                    name = photo_path.stem
+                    parts = name.split("_")
+                    
+                    if len(parts) < 5:
+                        continue
+                    
+                    ts = f"{parts[0]}_{parts[1]}"  # YYYYMMDD_HHMMSS
+                    cam_part = parts[2]  # CAMX
+                    evt_part = parts[3]  # EVTXXX
+                    shot_part = parts[4]  # SX
+                    
+                    # Extrair IDs
+                    cam_id = int(cam_part.replace("CAM", ""))
+                    event_uid = evt_part.replace("EVT", "")
+                    shot_idx = int(shot_part.replace("S", ""))
+                    
+                    # Verificar se existe crop correspondente
+                    crop_path = foto_dir / f"{name}_crop.jpg"
+                    crop_str = str(crop_path) if crop_path.exists() else None
+                    
+                    # Adicionar à interface
+                    self._add_thumbnail(cam_id, str(photo_path), ts, event_uid, shot_idx, crop_str)
+                    
+                except Exception as e:
+                    self.log.log("WARN", f"Erro ao carregar foto {photo_path.name}: {e}")
+                    
+        except Exception as e:
+            self.log.log("ERROR", f"Erro ao carregar fotos existentes: {e}")
 
     def _build_logs_tab(self):
         # Frame superior para controles
@@ -2441,7 +2501,8 @@ class InterfaceGrafica:
             return bool(self.var_log_warn.get())
         if level == "INFO":
             return bool(self.var_log_info.get())
-        return True
+        # Linhas sem nível identificado são tratadas como INFO
+        return bool(self.var_log_info.get())
 
     def _refresh_logs_view(self):
         if not hasattr(self, "text_logs"):
@@ -2696,18 +2757,17 @@ class InterfaceGrafica:
         # Verificar se é um novo dia para adicionar separador
         current_day = dt.date()
         if self.last_day_shown is not None and current_day != self.last_day_shown:
-            # Adicionar linha separadora entre dias
-            row = 0
+            # Adicionar linha separadora horizontal entre dias
             separator = tk.Frame(self.photos_wrap, height=3, bg="black")
-            separator.grid(row=row, column=0, sticky="ew", padx=0, pady=5)
+            separator.grid(row=len(self.thumb_groups_order), column=0, sticky="ew", padx=0, pady=5)
             
-            # Deslocar todos os grupos existentes
-            for other_uid in self.thumb_groups_order:
+            # Atualizar row de todos os grupos existentes (deslocar para baixo)
+            for i, other_uid in enumerate(self.thumb_groups_order):
                 g_existing = self.thumb_groups_by_uid[other_uid]
-                g_existing["row"] += 1
+                g_existing["row"] = i + 1
                 g_existing["thumbs_frame"].master.grid(row=g_existing["row"], column=0, sticky="w", padx=8, pady=10)
             
-            row = 1
+            row = len(self.thumb_groups_order) + 1
         else:
             row = 0
         
@@ -2717,9 +2777,9 @@ class InterfaceGrafica:
         self.thumb_groups_order.insert(0, uid)
         
         # Atualizar row de todos os grupos existentes (deslocar para baixo)
-        for other_uid in self.thumb_groups_order[1:]:
+        for i, other_uid in enumerate(self.thumb_groups_order[1:], start=1):
             g_existing = self.thumb_groups_by_uid[other_uid]
-            g_existing["row"] += 1
+            g_existing["row"] = i
             g_existing["thumbs_frame"].master.grid(row=g_existing["row"], column=0, sticky="w", padx=8, pady=10)
 
         g_frame = ttk.Frame(self.photos_wrap)
