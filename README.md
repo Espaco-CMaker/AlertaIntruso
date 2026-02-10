@@ -1,6 +1,6 @@
 # AlertaIntruso - Sistema de Alarme Inteligente por Visão Computacional
 
-**Versão Atual Baseada na: 4.5.7** (10/02/2026)
+**Versão Atual: 4.5.7** (10/02/2026)
 
 ## Descrição Geral
 
@@ -102,47 +102,109 @@ Edite `config.ini`:
 
 ## Desenvolvimento
 
-- **Versão**: 4.5.5
-- **Data**: 04/02/2026
+- **Versão**: 4.5.7
+- **Data**: 10/02/2026
 - **Autor**: Fabio Bettio
 - **Licença**: Uso educacional/experimental
 
-## Changelog
+## Changelog (Últimas 20 Versões)
 
-### v3.9.3 (01/01/2026)
-- Aba "Performance" redesenhada com tabela profissional (Treeview)
-- Adicionado contador de detecções totais por câmera
-- Interface mais profissional com colunas organizadas
-- Alertas visuais baseados em thresholds (FPS baixo, CPU/RAM alto, inferência lenta)
+### v4.5.7 (10/02/2026) - Correções e Melhorias de UX
+- Scroll do mouse habilitado na aba Fotos (MouseWheel binding)
+- Filtros de log corrigidos (linhas sem nível tratadas como INFO)
+- Evento movimento agora é INFO (não WARN)
+- Linha divisória entre dias corrigida (horizontal, posicionamento correto)
+- Fotos persistentes ao reiniciar aplicação (carrega do diretório)
 
-### v3.9.2 (01/01/2026)
-- Aba "Sobre" com versão, autor, data e link do GitHub
-- Incremento automático de microversão para alterações
+### v4.5.6 (04/02/2026) - Validação Final
+- Controle de qualidade JPEG configurável (50-100) na aba Config
+- Layout UI ajustado sem sobreposição de controles
+- Fotos enviadas ao Telegram com qualidade configurável
+- Sistema estável e pronto para uso
 
-### v3.9.1 (01/01/2026)
-- Log detalhado de eventos com parâmetros ativos
-- Log explícito de inicialização
-- Padronização de mensagens
+### v4.5.5 (04/02/2026) - Aceite & Estabilização
+- photo_callback e fila de fotos corrigidos (inclui crop_path)
+- Implementado TelegramBot.enviar_grupo_fotos() (sendMediaGroup)
+- Logs e filtros INFO/WARN/ERROR na aba Logs
+- Botão Limpar Logs apaga histórico
 
-### v3.9.0 (01/01/2026)
-- Estabilização arquitetural
-- EVENT_UID consistente
-- Agrupamento visual de fotos
-- Scroll na aba Fotos
+### v4.3.19 (02/02/2026) - Correção Crítica
+- BUG FIX CRÍTICO: Corrigido bug de "Confiança: 0.0%" em alertas Telegram
+- Armazenado conf_avg do evento inicial no atributo _event_conf_avg
+- Todas as fotos do mesmo evento usam a confiança original
 
-### v3.8.6
-- Miniaturas agrupadas por evento
+### v4.3.18 (02/02/2026) - Melhorias Visuais
+- Emoji-based color coding para níveis de confiança
+- Alertas críticos com código de cores
+- Safe division em conf_pct
 
-### v3.8.5
-- Evento apenas na linha central
+### v4.3.17 (02/02/2026) - Correção Crítica
+- Dupla validação de confiança após NMS
+- Apenas detecções com confiança ≥ threshold configurado são processadas
 
-### v3.8.4
-- Reconexão RTSP robusta
-- Watchdog por câmera
+### v4.3.16 (02/02/2026) - Correções
+- Fallback para bitrate interno se NetworkMonitor indisponível
+- Aba Performance exibe métricas mesmo sem Scapy/Npcap
 
-### v3.8.3
-- Interface em abas
-- Mosaico 2x2
+### v4.3.15 (02/02/2026) - Correções GUI
+- Conteúdo da aba Config visível com scroll funcional
+- Botões de controle fixos na base
+
+### v4.3.14 (02/02/2026) - Melhorias GUI
+- Fotos mais novas aparecem primeiro na aba Fotos
+- Eventos antigos descem automaticamente
+
+### v4.3.13 (02/02/2026) - Melhorias GUI
+- Botões de controle fixos na base
+- Não cortados em tela cheia
+
+### v4.3.12 (02/02/2026) - Melhorias GUI
+- Scroll na aba Config para navegação
+- Label melhorado: "Intervalo mín. entre fotos (s)"
+- Mouse wheel support
+
+### v4.3.11 (02/02/2026) - Otimizações RTSP
+- Backoff inicial aumentado de 2s para 5s
+- Máximo de backoff de 20s para 30s
+- Reduz ciclos rápidos de reconexão
+
+### v4.3.10 (02/02/2026) - Correções RTSP
+- Timeout aumentado de 5s para 10s
+- Buffer flush após reconectar (10 frames)
+- Corrige CAM3 reconnectando a cada ~30s
+
+### v4.3.9 (02/02/2026) - Melhorias
+- Nomes de classes na mensagem Telegram
+- Removido log "MOVIMENTO SEM PESSOA"
+- Mensagens mais compactas
+
+### v4.3.8 (01/02/2026) - Melhorias Telegram
+- Reduzida quantidade de dados por foto (1 decimal)
+- Economia de bandwidth
+
+### v4.3.7 (01/02/2026) - Melhorias LogManager
+- Detecta padrões críticos ("falha rtsp", "sem frame")
+- Erros críticos para Telegram
+- Status operacional em tempo real
+
+### v4.3.6 (01/02/2026) - Novo Recurso
+- Botão "Testar envio" na aba Config
+- Simula detecção com foto de teste
+
+### v4.3.5 (01/02/2026) - Correções GUI
+- Camera frames vazios ao desconectar (sem frozen frames)
+- Melhora visual em problemas de conexão
+
+### v4.3.4 (01/02/2026) - Melhorias GUI
+- Checkbox "Auto-scroll automático" na aba Logs
+- Persiste em config.ini
+- Melhora UX para debugging
+
+### v4.3.3 (31/01/2026) - Melhorias Telegram
+- Reduzido separador de dashes (12 chars)
+- Mensagens mais compactas
+
+**Para histórico completo, consulte [CHANGELOG.md](CHANGELOG.md)**
 
 ## Contribuição
 

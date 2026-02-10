@@ -6,22 +6,36 @@ secrets.json
 credentials.json
 config.ini
 log.txt
+log.bak
+*.key
+*.pem
 
 # Arquivos locais
 *.log
 *.tmp
 *.cache
-fotos/
+fotos/                      # Fotos podem conter dados sensíveis
 build/
-dist/models/
+dist/
+models/                     # Modelos podem ser grandes
 
 # VS Code
 .vscode/
+.vscode/settings.json
 
 # Python
 __pycache__/
 *.pyc
+*.pyo
+.pytest_cache/
+.coverage
+htmlcov/
 
 # Sistema
 .DS_Store
 Thumbs.db
+
+# IDE
+.idea/
+*.swp
+*.swo

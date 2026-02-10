@@ -1,0 +1,81 @@
+# config.ini.example - TEMPLATE DE CONFIGURAÇÃO
+
+# ⚠️ IMPORTANTE: Este é um arquivo de exemplo
+# Copie este arquivo para "config.ini" e preencha com suas informações
+# NUNCA compartilhe o config.ini real no repositório
+
+[CAM1]
+enabled = False
+rtsp_url = rtsp://usuario:senha@192.168.x.x:554/stream
+
+[CAM2]
+enabled = False
+rtsp_url = rtsp://usuario:senha@192.168.x.x:554/stream
+
+[CAM3]
+enabled = False
+rtsp_url = rtsp://usuario:senha@192.168.x.x:554/stream
+
+[CAM4]
+enabled = False
+rtsp_url = rtsp://usuario:senha@192.168.x.x:554/stream
+
+[DETECTOR]
+cooldown = 3
+confidence_threshold = 0.20
+nms_threshold = 0.30
+photos_per_event = 1
+classes_enabled = person,bus,truck,motorcycle,bicycle,dog,cat,bird
+min_capture_interval_s = 6.0
+skip_frames = 2
+input_size = 320
+rtsp_transport = udp
+max_photos_keep = 500
+jpeg_quality = 100
+
+[TELEGRAM]
+# Obtenha token em https://t.me/BotFather
+# Obtenha chat_id em https://t.me/userinfobot
+bot_token = YOUR_BOT_TOKEN_HERE
+chat_id = YOUR_CHAT_ID_HERE
+alert_mode = all
+
+[UI]
+show_tips = True
+auto_scroll_logs = True
+log_show_info = False
+log_show_warn = True
+log_show_error = True
+
+# ==============================================================================
+# COMO CONFIGURAR:
+# ==============================================================================
+#
+# 1. CÂMERAS RTSP (CAM1-4):
+#    - Copie este arquivo: config.ini.example → config.ini
+#    - Substitua rtsp_url por sua câmera IP real
+#    - Formato: rtsp://[usuario]:[senha]@[IP]:[porta]/[stream]
+#    - Exemplo real: rtsp://admin:12345@192.168.1.100:554/stream
+#    - Defina enabled = True para câmeras que deseja monitorar
+#
+# 2. TELEGRAM (OPCIONAL):
+#    - Crie bot com @BotFather no Telegram
+#    - Copie o token (ex: 123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11)
+#    - Obtenha seu chat_id com @userinfobot (ex: 123456789)
+#    - Para grupos, o chat_id começa com "-"
+#    - Defina bot_token e chat_id para receber notificações
+#
+# 3. DETECTOR:
+#    - cooldown: segundos entre detecções (default: 3)
+#    - confidence_threshold: confiança mínima 0-1 (default: 0.20)
+#    - nms_threshold: supressão de não-máxima (default: 0.30)
+#    - skip_frames: pular frames para performance (default: 2)
+#    - input_size: resolução YOLO 224/320/416/608 (default: 320)
+#
+# 4. SEGURANÇA:
+#    ⚠️  NUNCA compartilhe este arquivo com credenciais reais
+#    ⚠️  NUNCA faça commit de config.ini no Git
+#    ⚠️  Use variáveis de ambiente ou .env para dados sensíveis
+#    ⚠️  O arquivo está no .gitignore por segurança
+#
+# ==============================================================================

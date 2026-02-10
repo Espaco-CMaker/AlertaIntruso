@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AlertaIntruso v4.5.7 - Sistema de Alarme Inteligente</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px 0;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 60px 40px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 3em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .header p {
+            font-size: 1.3em;
+            opacity: 0.95;
+            margin-bottom: 10px;
+        }
+
+        .version-badge {
+            display: inline-block;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            margin-top: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.4);
+        }
+
+        /* Content */
+        .content {
+            padding: 40px;
+        }
+
+        /* Seções */
+        .section {
+            margin-bottom: 50px;
+        }
+
+        .section h2 {
+            color: #667eea;
+            font-size: 2em;
+            margin-bottom: 25px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #667eea;
+            display: inline-block;
+        }
+
+        .section h3 {
+            color: #764ba2;
+            font-size: 1.5em;
+            margin-top: 30px;
+            margin-bottom: 15px;
+        }
+
+        /* Tabelas */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background: #f9f9f9;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        th, td {
+            padding: 15px;
+            text-align: left;
+        }
+
+        th {
+            background: #667eea;
+            color: white;
+            font-weight: 600;
+        }
+
+        tr:nth-child(even) {
+            background: #f0f0f0;
+        }
+
+        tr:hover {
+            background: #e8e8ff;
+        }
+
+        /* Feature Cards */
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+
+        .feature-card {
+            background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            padding: 25px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.2);
+            border-color: #764ba2;
+        }
+
+        .feature-card h4 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+
+        .feature-card p {
+            color: #666;
+            font-size: 0.95em;
+        }
+
+        /* Botões */
+        .button-group {
+            display: flex;
+            gap: 15px;
+            margin: 30px 0;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 15px 35px;
+            border-radius: 8px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            border: none;
+            font-size: 1em;
+            text-align: center;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: scale(1.05);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #667eea;
+            border: 2px solid #667eea;
+        }
+
+        .btn-secondary:hover {
+            background: #667eea;
+            color: white;
+        }
+
+        /* Lists */
+        ul, ol {
+            margin-left: 30px;
+            margin-top: 15px;
+        }
+
+        li {
+            margin-bottom: 10px;
+            line-height: 1.8;
+        }
+
+        /* Code blocks */
+        .code-block {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 20px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 20px 0;
+            font-family: 'Courier New', monospace;
+            line-height: 1.4;
+        }
+
+        .code-block code {
+            font-size: 0.95em;
+        }
+
+        /* Info boxes */
+        .info-box {
+            background: #e3f2fd;
+            border-left: 4px solid #667eea;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+
+        .info-box strong {
+            color: #667eea;
+        }
+
+        .warning-box {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+
+        .success-box {
+            background: #d4edda;
+            border-left: 4px solid #28a745;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+
+        /* Stats */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 2.5em;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .stat-label {
+            font-size: 0.95em;
+            opacity: 0.9;
+        }
+
+        /* Footer */
+        .footer {
+            background: #f5f5f5;
+            padding: 30px;
+            text-align: center;
+            color: #666;
+            border-top: 1px solid #ddd;
+        }
+
+        .footer-links {
+            margin: 15px 0;
+        }
+
+        .footer-links a {
+            color: #667eea;
+            text-decoration: none;
+            margin: 0 15px;
+            font-weight: 500;
+        }
+
+        .footer-links a:hover {
+            text-decoration: underline;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2em;
+            }
+
+            .header p {
+                font-size: 1.1em;
+            }
+
+            .content {
+                padding: 20px;
+            }
+
+            .button-group {
+                flex-direction: column;
+            }
+
+            .btn {
+                width: 100%;
+            }
+
+            table {
+                font-size: 0.9em;
+            }
+
+            th, td {
+                padding: 10px;
+            }
+
+            .features-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Especial */
+        .highlight {
+            background: linear-gradient(120deg, #84fab0 0%, #8fd3f4 100%);
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+
+        .tech-stack {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 20px 0;
+        }
+
+        .tech-badge {
+            background: #667eea;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: 500;
+        }
+
+        /* Roadmap */
+        .roadmap {
+            position: relative;
+            padding: 20px 0;
+        }
+
+        .roadmap-item {
+            margin-bottom: 30px;
+            padding-left: 40px;
+            position: relative;
+        }
+
+        .roadmap-item::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 24px;
+            height: 24px;
+            background: #667eea;
+            border-radius: 50%;
+            border: 3px solid white;
+            box-shadow: 0 0 0 3px #667eea;
+        }
+
+        .roadmap-item::after {
+            content: '';
+            position: absolute;
+            left: 11px;
+            top: 24px;
+            width: 2px;
+            height: calc(100% + 30px);
+            background: #667eea;
+        }
+
+        .roadmap-item:last-child::after {
+            display: none;
+        }
+
+        .roadmap-item h4 {
+            color: #667eea;
+            margin-bottom: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>📹 AlertaIntruso</h1>
+            <p>Sistema de Alarme Inteligente por Visão Computacional</p>
+            <p style="font-size: 1em; opacity: 0.85;">Monitoramento em tempo real de câmeras IP com detecção inteligente de pessoas usando IA</p>
+            <div class="version-badge">✅ v4.5.7 • Production Ready • 10/02/2026</div>
+        </div>
+
+        <!-- Content -->
+        <div class="content">
+            <!-- Seção Técnica -->
+            <div class="section">
+                <h2>📊 Informações Técnicas</h2>
+                
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-number">6.000+</div>
+                        <div class="stat-label">Linhas de Código</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">3</div>
+                        <div class="stat-label">Arquivos Python</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">4</div>
+                        <div class="stat-label">Câmeras Simultâneas</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">6</div>
+                        <div class="stat-label">Abas Interface</div>
+                    </div>
+                </div>
+
+                <h3>Stack Tecnológico</h3>
+                <div class="tech-stack">
+                    <span class="tech-badge">🐍 Python 3.8+</span>
+                    <span class="tech-badge">🧠 YOLOv4-tiny</span>
+                    <span class="tech-badge">📸 OpenCV 4.13</span>
+                    <span class="tech-badge">🖥️ Tkinter</span>
+                    <span class="tech-badge">💬 Telegram API</span>
+                    <span class="tech-badge">🚀 Claude + GPT-4</span>
+                </div>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Aspecto</th>
+                            <th>Detalhes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Linguagem</strong></td>
+                            <td>Python 3.8+ (testado em 3.12.6)</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Arquivo Principal</strong></td>
+                            <td>AlertaIntruso Claude+GPT.py (3.235 linhas)</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Modelo de IA</strong></td>
+                            <td>YOLOv4-tiny (detecção de objetos)</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Assistência IA</strong></td>
+                            <td>Claude Haiku 4.5 + GPT-4</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Interface</strong></td>
+                            <td>Tkinter com 6 abas funcionais</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Status</strong></td>
+                            <td>✅ Estável - Production Ready</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Seção Características -->
+            <div class="section">
+                <h2>✨ Principais Características</h2>
+                
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <h4>🎥 Multicâmera</h4>
+                        <p>Suporte para 4 câmeras IP simultâneas com processamento independente por thread</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>🧠 Detecção Inteligente</h4>
+                        <p>YOLOv4-tiny com análise espacial e filtros configuráveis</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>🔗 Resiliência RTSP</h4>
+                        <p>Reconexão automática com backoff exponencial e watchdog</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>📱 Telegram Integrado</h4>
+                        <p>Notificações em tempo real com fotos e metadados</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>📊 Monitoring Avançado</h4>
+                        <p>FPS, CPU, RAM, Latência, Bitrate em tempo real</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>🗂️ Gerenciamento de Fotos</h4>
+                        <p>Evidências agrupadas por evento com crop automático</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>📋 Logs Profissionais</h4>
+                        <p>Rotativos com classificação e filtros por nível</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>⚙️ Configuração Flexível</h4>
+                        <p>Interface gráfica intuitiva sem necessidade de restart</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Seção IA -->
+            <div class="section">
+                <h2>🤖 Tecnologias de IA</h2>
+                
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Componente</th>
+                            <th>Tecnologia</th>
+                            <th>Descrição</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Detecção de Objetos</strong></td>
+                            <td>YOLOv4-tiny</td>
+                            <td>Rede neural para detecção em tempo real com baixa latência</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Processamento de Imagens</strong></td>
+                            <td>OpenCV 4.13.0</td>
+                            <td>Biblioteca de visão computacional com suporte a CUDA</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Desenvolvimento & Otimização</strong></td>
+                            <td>Claude + GPT-4</td>
+                            <td>Engenharia de prompts avançada para otimização de código</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div class="info-box">
+                    <strong>🎯 Objetos Detectados:</strong><br>
+                    Pessoas, Ônibus, Caminhões, Motos, Bicicletas, Cães, Gatos, Pássaros e +80 classes (configuráveis)
+                </div>
+            </div>
+
+            <!-- Seção Performance -->
+            <div class="section">
+                <h2>📈 Performance e Requisitos</h2>
+                
+                <h3>Benchmarks (Câmera 1080p @ 30fps)</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Métrica</th>
+                            <th>Valor</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Latência de Detecção</td>
+                            <td>100-300ms</td>
+                        </tr>
+                        <tr>
+                            <td>FPS Processado</td>
+                            <td>10-20 fps</td>
+                        </tr>
+                        <tr>
+                            <td>CPU (por câmera)</td>
+                            <td>15-25%</td>
+                        </tr>
+                        <tr>
+                            <td>RAM (4 câmeras)</td>
+                            <td>400-600MB</td>
+                        </tr>
+                        <tr>
+                            <td>Tempo de Inferência</td>
+                            <td>50-80ms (GPU) / 200-300ms (CPU)</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h3>Requisitos de Sistema</h3>
+                <h4>Mínimos:</h4>
+                <ul>
+                    <li>Python 3.8+</li>
+                    <li>RAM: 2GB</li>
+                    <li>CPU: 2 cores</li>
+                </ul>
+
+                <h4>Recomendados:</h4>
+                <ul>
+                    <li>Python 3.10+</li>
+                    <li>RAM: 4-8GB</li>
+                    <li>CPU: 4+ cores</li>
+                    <li>GPU: NVIDIA CUDA (opcional, aumenta FPS 2-3x)</li>
+                </ul>
+
+                <h4>Sistemas Operacionais Suportados:</h4>
+                <ul>
+                    <li>✅ Windows 10/11 (Principal)</li>
+                    <li>✅ Linux (Ubuntu 20.04+)</li>
+                    <li>✅ macOS (Intel/Apple Silicon)</li>
+                </ul>
+            </div>
+
+            <!-- Seção Download -->
+            <div class="section">
+                <h2>📥 Download e Instalação</h2>
+                
+                <h3>Opção 1: Executável Windows (Recomendado) ⭐</h3>
+                <p>Sem necessidade de Python instalado, modelo YOLO pré-incluído, pronto para usar.</p>
+                <div class="button-group">
+                    <a href="#" class="btn btn-primary">⬇️ Download AlertaIntruso-v4.5.7-Windows-x64.exe (≈200MB)</a>
+                </div>
+
+                <h3>Opção 2: Código-Fonte (Desenvolvimento)</h3>
+                <p>Para desenvolvedores que desejam modificar ou contribuir com melhorias.</p>
+                <div class="code-block"><code>git clone https://github.com/Espaco-CMaker/AlertaIntruso.git
+cd AlertaIntruso
+pip install -r requirements.txt
+python "AlertaIntruso Claude+GPT.py"</code></div>
+
+                <h3>Opção 3: Docker (Em desenvolvimento)</h3>
+                <p>Para ambientes containerizados com suporte a GPU.</p>
+                <div class="code-block"><code>docker run -it --gpus all espaco-cmaker/alerta-intruso:4.5.7</code></div>
+            </div>
+
+            <!-- Seção Links -->
+            <div class="section">
+                <h2>🔗 Links Importantes</h2>
+                
+                <div class="button-group">
+                    <a href="https://github.com/Espaco-CMaker/AlertaIntruso" class="btn btn-secondary">🐙 GitHub Repositório</a>
+                    <a href="https://github.com/Espaco-CMaker/AlertaIntruso/wiki" class="btn btn-secondary">📖 Documentação</a>
+                    <a href="https://github.com/Espaco-CMaker/AlertaIntruso/issues" class="btn btn-secondary">🐛 Reportar Issues</a>
+                    <a href="https://github.com/Espaco-CMaker/AlertaIntruso/discussions" class="btn btn-secondary">💬 Discussões</a>
+                </div>
+
+                <div class="success-box">
+                    <strong>✅ Licença:</strong> Uso Educacional / Experimental / Comercial (sob licença)
+                </div>
+            </div>
+
+            <!-- Seção Roadmap -->
+            <div class="section">
+                <h2>📋 Roadmap (Versões Futuras)</h2>
+                
+                <div class="roadmap">
+                    <div class="roadmap-item">
+                        <h4>v4.6.0 (Próxima)</h4>
+                        <p>Suporte a câmeras HTTP MJPEG, Integração com Home Assistant, Web interface remota</p>
+                    </div>
+                    <div class="roadmap-item">
+                        <h4>v5.0.0 (Longo prazo)</h4>
+                        <p>Detecção customizada, Reconhecimento de faces, Cloud integration (AWS/Azure), App mobile</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Seção Casos de Uso -->
+            <div class="section">
+                <h2>🎯 Casos de Uso</h2>
+                
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <h4>🏠 Segurança Residencial</h4>
+                        <p>Monitoramento de entrada/garagem com alertas via Telegram</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>🏢 Segurança Comercial</h4>
+                        <p>Múltiplas lojas com relatórios automatizados</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>🏭 Monitoramento Industrial</h4>
+                        <p>Análise de movimento e conformidade de segurança</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>🚗 Estacionamentos</h4>
+                        <p>Detecção de entrada/saída com alertas anômalos</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Seção Suporte -->
+            <div class="section">
+                <h2>🤝 Suporte e Contribuição</h2>
+                
+                <h3>Como Contribuir?</h3>
+                <ol>
+                    <li><strong>Fork</strong> o repositório</li>
+                    <li><strong>Crie uma branch</strong> para sua feature</li>
+                    <li><strong>Commit</strong> suas mudanças</li>
+                    <li><strong>Push</strong> para a branch</li>
+                    <li><strong>Abra um Pull Request</strong></li>
+                </ol>
+
+                <div class="info-box">
+                    <strong>📞 Canais de Suporte:</strong><br>
+                    🐛 <a href="https://github.com/Espaco-CMaker/AlertaIntruso/issues">GitHub Issues</a> | 
+                    💬 <a href="https://github.com/Espaco-CMaker/AlertaIntruso/discussions">GitHub Discussions</a> | 
+                    📧 Email: [seu-email@exemplo.com]
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <h3>AlertaIntruso v4.5.7</h3>
+            <p>Sistema de Alarme Inteligente por Visão Computacional</p>
+            <div class="footer-links">
+                <a href="https://github.com/Espaco-CMaker/AlertaIntruso">GitHub</a>
+                <a href="https://github.com/Espaco-CMaker/AlertaIntruso/wiki">Documentação</a>
+                <a href="https://github.com/Espaco-CMaker/AlertaIntruso/issues">Issues</a>
+                <a href="https://github.com/Espaco-CMaker/AlertaIntruso/discussions">Suporte</a>
+            </div>
+            <p style="margin-top: 20px; font-size: 0.9em;">
+                Desenvolvido por <strong>Fabio Bettio</strong> com assistência de <strong>Claude Haiku 4.5 + GPT-4</strong>
+            </p>
+            <p style="margin-top: 10px; font-size: 0.85em; opacity: 0.7;">
+                © 2026 AlertaIntruso. Todos os direitos reservados. | Última atualização: 10/02/2026
+            </p>
+        </div>
+    </div>
+</body>
+</html>

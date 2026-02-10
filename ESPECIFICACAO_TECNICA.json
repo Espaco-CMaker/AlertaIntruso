@@ -1,0 +1,382 @@
+{
+  "aplicacao": {
+    "nome": "AlertaIntruso",
+    "tagline": "Sistema de Alarme Inteligente por Visão Computacional",
+    "descricao_curta": "Monitoramento em tempo real de câmeras IP com detecção inteligente de pessoas usando YOLOv4-tiny",
+    "descricao_completa": "AlertaIntruso é uma aplicação desktop em Python desenvolvida para monitoramento contínuo (24/7) de múltiplas câmeras IP via RTSP, utilizando detecção de pessoas com OpenCV DNN (YOLOv4-tiny). O sistema prioriza robustez operacional, tolerância a falhas de stream, controle de falsos positivos e rastreabilidade completa de eventos de movimento.",
+    "versao": "4.5.7",
+    "data_lancamento": "2026-02-10",
+    "status": "Estável - Production Ready",
+    "autor": "Fabio Bettio",
+    "licenca": "Educacional / Experimental / Comercial"
+  },
+
+  "tecnicas": {
+    "linguagem_principal": "Python",
+    "versao_python": "3.8+",
+    "versao_testada": "3.12.6",
+    "linhas_codigo": 6000,
+    "arquivos_python": 3,
+    "arquivo_principal": {
+      "nome": "AlertaIntruso Claude+GPT.py",
+      "linhas": 3235
+    },
+    "arquivos_secundarios": [
+      {
+        "nome": "AlertaIntruso v5.py",
+        "linhas": 2640
+      },
+      {
+        "nome": "update_version.py",
+        "linhas": 125
+      }
+    ]
+  },
+
+  "tecnologias": {
+    "framework_ui": {
+      "nome": "Tkinter",
+      "tipo": "GUI Desktop",
+      "abas": 6
+    },
+    "visao_computacional": {
+      "principal": "OpenCV",
+      "versao": "4.13.0",
+      "suporte": ["RTSP/FFmpeg", "CUDA GPU", "Processamento de frames"]
+    },
+    "modelo_ia": {
+      "nome": "YOLOv4-tiny",
+      "tipo": "Rede Neural Convolucional",
+      "resolucao": "320x320",
+      "classes_detectaveis": 80,
+      "classes_padrao": ["person", "bus", "truck", "motorcycle", "bicycle", "dog", "cat", "bird"],
+      "peso_arquivo": "48MB"
+    },
+    "api_externas": {
+      "telegram": "Telegram Bot API",
+      "monitoramento": ["psutil", "Scapy (opcional)"]
+    },
+    "assistencia_ia_desenvolvimento": {
+      "modelos": ["Claude Haiku 4.5", "GPT-4"],
+      "uso": "Engenharia de prompts para otimização de código"
+    }
+  },
+
+  "features": {
+    "camera": {
+      "descricao": "Suporte para múltiplas câmeras IP",
+      "quantidades": 4,
+      "protocolo": "RTSP",
+      "processamento": "Independente por thread",
+      "configuracao": "Em tempo real via GUI"
+    },
+    "deteccao": {
+      "descricao": "Detecção inteligente de objetos",
+      "modelo": "YOLOv4-tiny",
+      "analise_espacial": true,
+      "linha_central": "Detecção apenas na linha central",
+      "filtros": ["Confiança ajustável", "NMS configurável", "Múltiplas classes"]
+    },
+    "resiliencia": {
+      "descricao": "Robustez operacional",
+      "reconexao": "Automática com backoff exponencial",
+      "backoff_range": "5s-30s",
+      "watchdog": true,
+      "auto_recovery": ["soft restart", "hard restart"]
+    },
+    "telegram": {
+      "descricao": "Integração com Telegram",
+      "notificacoes": true,
+      "fotos": true,
+      "metadados": true,
+      "envio_grupo": "sendMediaGroup",
+      "crop_automatico": true
+    },
+    "monitoring": {
+      "descricao": "Métricas em tempo real",
+      "metricas": ["FPS", "CPU%", "RAM%", "Latência", "Bitrate", "Jitter", "Ping", "Perda de frames"],
+      "alertas_visuais": true
+    },
+    "fotos": {
+      "descricao": "Gerenciamento de evidências",
+      "agrupamento": "Por EVENT_UID",
+      "crop": "Automático",
+      "limite": 500,
+      "persistencia": true
+    },
+    "logs": {
+      "descricao": "Sistema de logs profissional",
+      "rotacao": true,
+      "tamanho_maximo": "5MB",
+      "backups": 10,
+      "classificacao": ["INFO", "WARN", "ERROR"],
+      "filtros": true,
+      "color_coded": true
+    },
+    "configuracao": {
+      "descricao": "Interface de configuração",
+      "tipo": "GUI Tkinter",
+      "persistencia": "config.ini",
+      "restart_necessario": false
+    }
+  },
+
+  "performance": {
+    "camera_teste": "1080p @ 30fps",
+    "metricas": {
+      "latencia_deteccao_ms": "100-300",
+      "fps_processado": "10-20",
+      "cpu_por_camera_percent": "15-25",
+      "ram_4_cameras_mb": "400-600",
+      "tempo_inferencia_gpu_ms": "50-80",
+      "tempo_inferencia_cpu_ms": "200-300"
+    },
+    "ambiente_teste": "Intel i7-10700K + RTX 2080 Ti"
+  },
+
+  "requisitos": {
+    "minimos": {
+      "python": "3.8+",
+      "ram_gb": 2,
+      "cpu_cores": 2,
+      "internet": "Recomendado"
+    },
+    "recomendados": {
+      "python": "3.10+",
+      "ram_gb": "4-8",
+      "cpu_cores": "4+",
+      "gpu": "NVIDIA CUDA (opcional)"
+    },
+    "sistemas_operacionais": [
+      "Windows 10/11 (Principal)",
+      "Linux (Ubuntu 20.04+)",
+      "macOS (Intel/Apple Silicon)"
+    ]
+  },
+
+  "dependencias": {
+    "essenciais": [
+      {
+        "nome": "opencv-python",
+        "versao": ">=4.13.0",
+        "descricao": "Visão computacional"
+      },
+      {
+        "nome": "requests",
+        "versao": ">=2.31.0",
+        "descricao": "HTTP para Telegram"
+      },
+      {
+        "nome": "psutil",
+        "versao": ">=5.9.0",
+        "descricao": "Métricas de performance"
+      },
+      {
+        "nome": "numpy",
+        "versao": ">=1.24.0",
+        "descricao": "Computação numérica"
+      },
+      {
+        "nome": "Pillow",
+        "versao": ">=9.0.0",
+        "descricao": "Processamento de imagens"
+      }
+    ],
+    "opcionais": [
+      {
+        "nome": "scapy",
+        "versao": ">=2.5.0",
+        "descricao": "Network monitoring"
+      },
+      {
+        "nome": "npcap",
+        "tipo": "Windows driver",
+        "descricao": "Network packet capture"
+      }
+    ]
+  },
+
+  "arquivos": {
+    "codigo": [
+      "AlertaIntruso Claude+GPT.py",
+      "AlertaIntruso v5.py",
+      "update_version.py"
+    ],
+    "modelos": [
+      "models/yolov4-tiny.cfg",
+      "models/yolov4-tiny.weights",
+      "models/coco.names"
+    ],
+    "configuracao": [
+      "config.ini"
+    ],
+    "logs": [
+      "log.txt",
+      "log.bak"
+    ],
+    "documentacao": [
+      "README.md",
+      "README_v5.md",
+      "CHANGELOG.md",
+      "STATUS.md",
+      "RELEASE.md",
+      "NPCAP_INSTALL.md",
+      "ESPECIFICACAO_TELEGRAM.md"
+    ]
+  },
+
+  "interface": {
+    "abas": [
+      {
+        "nome": "Vídeo",
+        "descricao": "Mosaico 2x2 redimensionável com overlays de detecções"
+      },
+      {
+        "nome": "Config",
+        "descricao": "Configuração de câmeras, Telegram e parâmetros de detecção"
+      },
+      {
+        "nome": "Fotos",
+        "descricao": "Galeria de evidências agrupadas por evento com crop"
+      },
+      {
+        "nome": "Logs",
+        "descricao": "Logs em tempo real com filtros e auto-scroll"
+      },
+      {
+        "nome": "Performance",
+        "descricao": "Tabela profissional com métricas por câmera"
+      },
+      {
+        "nome": "Sobre",
+        "descricao": "Informações da aplicação e links"
+      }
+    ]
+  },
+
+  "fluxo_deteccao": [
+    "Conexão RTSP resiliente (FFmpeg/OpenCV)",
+    "Leitura protegida de frames com tratamento de erros",
+    "Validação do frame (None, tamanho zero, baixa variância)",
+    "Inferência YOLOv4-tiny",
+    "Filtro por classes habilitadas",
+    "Análise espacial (evento somente na linha central)",
+    "Classificação: movimento SEM pessoa → log INFO; COM pessoa → evento",
+    "Geração de EVENT_UID único",
+    "Captura de evidências (fotos espaçadas)",
+    "Notificação opcional (Telegram)",
+    "Atualização da interface gráfica"
+  ],
+
+  "casos_uso": [
+    {
+      "tipo": "Segurança Residencial",
+      "aplicacoes": ["Monitoramento de entrada", "Garagem", "Detecção de intrusos", "Alertas via Telegram"]
+    },
+    {
+      "tipo": "Segurança Comercial",
+      "aplicacoes": ["Múltiplas lojas", "Análise de tráfego", "Relatórios automatizados", "Integração com alarmes"]
+    },
+    {
+      "tipo": "Monitoramento Industrial",
+      "aplicacoes": ["Detecção de equipamentos", "Análise de movimento", "Conformidade de segurança", "Auditoria"]
+    },
+    {
+      "tipo": "Estacionamentos",
+      "aplicacoes": ["Detecção de entrada/saída", "Contagem de veículos", "Alertas anômalos"]
+    }
+  ],
+
+  "changelog": {
+    "v4.5.7": {
+      "data": "2026-02-10",
+      "tipo": "Correções UX",
+      "melhorias": [
+        "Scroll do mouse habilitado na aba Fotos",
+        "Filtros de log corrigidos (linhas sem nível = INFO)",
+        "Evento movimento como INFO (não WARN)",
+        "Linha divisória entre dias corrigida",
+        "Fotos persistentes ao reiniciar"
+      ]
+    },
+    "v4.5.6": {
+      "data": "2026-02-04",
+      "tipo": "Validação Final",
+      "status": "Validated"
+    },
+    "v4.5.5": {
+      "data": "2026-02-04",
+      "tipo": "Aceite - Estabilização"
+    },
+    "v4.5.4": {
+      "data": "2026-02-04",
+      "tipo": "Padronização - Logs"
+    }
+  },
+
+  "links": {
+    "github": "https://github.com/Espaco-CMaker/AlertaIntruso",
+    "documentacao": "https://github.com/Espaco-CMaker/AlertaIntruso/wiki",
+    "issues": "https://github.com/Espaco-CMaker/AlertaIntruso/issues",
+    "discussions": "https://github.com/Espaco-CMaker/AlertaIntruso/discussions",
+    "demo": "https://youtube.com/..."
+  },
+
+  "download": {
+    "windows": {
+      "nome": "AlertaIntruso-v4.5.7-Windows-x64.exe",
+      "tamanho_mb": 200,
+      "descricao": "Executável standalone (sem Python necessário)"
+    },
+    "codigo_fonte": {
+      "tipo": "GitHub Repository",
+      "url": "https://github.com/Espaco-CMaker/AlertaIntruso"
+    },
+    "docker": {
+      "imagem": "espaco-cmaker/alerta-intruso:4.5.7",
+      "status": "Em desenvolvimento"
+    }
+  },
+
+  "roadmap": {
+    "v4.6.0": {
+      "status": "Próxima",
+      "features": [
+        "Suporte a câmeras HTTP MJPEG",
+        "Integração com Home Assistant",
+        "Web interface remota",
+        "Analytics dashboard"
+      ]
+    },
+    "v5.0.0": {
+      "status": "Longo prazo",
+      "features": [
+        "Detecção customizada com transfer learning",
+        "Reconhecimento de faces",
+        "Integração com cloud (AWS/Azure)",
+        "Aplicativo mobile nativo"
+      ]
+    }
+  },
+
+  "seguranca": {
+    "config_encriptado": false,
+    "logs_locais": true,
+    "rtsp_credenciais": true,
+    "fotos_locais": true,
+    "telegram_token_secreto": true,
+    "codigo_aberto": true,
+    "auditoria": "Possível (código aberto)"
+  },
+
+  "suporte": {
+    "canais": [
+      "GitHub Issues",
+      "GitHub Discussions",
+      "Email"
+    ],
+    "documentacao": true,
+    "faq": true,
+    "comunidade": true
+  }
+}

@@ -257,7 +257,7 @@ def set_ffmpeg_capture_options(transport: str = "udp") -> None:
 
 set_ffmpeg_capture_options("udp")
 
-APP_VERSION = "4.5.5"
+APP_VERSION = "4.5.7"
 MAX_THUMBS = 200
 
 # ----------------------------- Tips do Menu de Configurações -----------------------------
