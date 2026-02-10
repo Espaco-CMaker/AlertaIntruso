@@ -23,7 +23,7 @@ REM Confirmar que config.ini está ignorado
 echo [2/6] Validando segurança (config.ini deve estar ignorado)...
 git check-ignore config.ini
 if errorlevel 1 (
-    echo AVISO: config.ini nao esta siendo ignorado!
+    echo AVISO: config.ini nao esta sendo ignorado!
     pause
     exit /b 1
 )
@@ -42,19 +42,12 @@ echo.
 
 REM Fazer commit
 echo [5/6] Fazendo commit...
-git commit -m "docs: adiciona documentacao de downloads, seguranca e guias v4.5.7
-
-- RESUMO_DOWNLOADS.md: pagina downloads completa
-- PAGINA_DOWNLOADS.html: HTML pronto para website
-- SUMARIO_EXECUTIVO.md: resumo para decisores
-- GUIA_INSTALACAO_DOWNLOAD.md: tutorial passo a passo
-- ESPECIFICACAO_TECNICA.json: specs estruturadas
-- config.ini.example: template de configuracao seguro
-- GUIA_SEGURANCA_REPOSITORIO.md: guia completo seguranca
-- CHECKLIST_PRE_PUSH.md: checklist pre-publicacao
-- GUIA_GIT_PUSH.md: instrucoes de push
-- .gitignore: fortalecido para dados sensiveis
-- Verifica e remove dados sensiveis de config.ini"
+git diff --cached --quiet
+if errorlevel 1 (
+    git commit -m "docs: atualiza README e changelog"
+) else (
+    echo Nenhuma mudanca para commitar.
+)
 echo.
 
 REM Fazer push

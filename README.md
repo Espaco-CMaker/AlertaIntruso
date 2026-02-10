@@ -94,6 +94,20 @@ Edite `config.ini`:
 - [DETECTOR]: cooldown_s, conf_th, nms_th, etc.
 - [TELEGRAM]: bot_token, chat_id
 
+## Mini tutorial: configurar Telegram (usuario)
+
+1. Abra o Telegram e procure por `@BotFather`.
+2. Envie `/newbot` e siga as instrucoes para criar o bot.
+3. Copie o `token` que o BotFather enviar (exemplo: `123456:ABC...`).
+4. Crie um grupo no Telegram (ou use uma conversa com voce mesmo) e adicione o bot.
+5. Envie uma mensagem no grupo.
+6. Para obter o `chat_id`, procure por `@userinfobot` e inicie o bot.
+7. Encaminhe para o `@userinfobot` uma mensagem do grupo. Ele respondera com o `chat_id`.
+8. Abra o arquivo `config.ini` e preencha:
+	- `bot_token = SEU_TOKEN`
+	- `chat_id = SEU_CHAT_ID`
+9. No aplicativo, abra a aba Config e clique em "Testar envio".
+
 ## Logs e Monitoramento
 
 - **log.txt**: Logs rotativos (5MB, backup automático)
