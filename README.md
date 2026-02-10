@@ -87,6 +87,16 @@ O **AlertaIntruso** é uma aplicação desktop em Python desenvolvida para monit
 python "AlertaIntruso Claude+GPT.py"
 ```
 
+## 🚀 Configuração Rápida do Telegram (5 Passos)
+
+Para receber alertas no celular:
+
+1. **Crie o bot**: Telegram → `@BotFather` → `/newbot` → copie o **token**
+2. **Crie grupo**: Novo grupo → adicione o bot → envie mensagem
+3. **Pegue chat_id**: Encaminhe mensagem do grupo para `@userinfobot` → copie o **ID**
+4. **Configure**: Abra o app → aba Config → cole token e chat_id nos campos
+5. **Teste**: Clique "Testar envio" → ✅ Pronto!
+
 ## Configuração
 
 Edite `config.ini`:
@@ -94,21 +104,29 @@ Edite `config.ini`:
 - [DETECTOR]: cooldown_s, conf_th, nms_th, etc.
 - [TELEGRAM]: bot_token, chat_id
 
-## Mini tutorial: configurar Telegram (usuario)
+### Tutorial Detalhado: Telegram (passo a passo)
 
-1. Abra o Telegram e procure por `@BotFather`.
-2. Envie `/newbot` e siga as instrucoes para criar o bot.
-3. Copie o `token` que o BotFather enviar (exemplo: `123456:ABC...`).
-4. Crie um grupo no Telegram (ou use uma conversa com voce mesmo) e adicione o bot.
-5. Envie uma mensagem no grupo.
-6. Para obter o `chat_id`, procure por `@userinfobot` e inicie o bot.
-7. Encaminhe para o `@userinfobot` uma mensagem do grupo. Ele respondera com o `chat_id`.
-8. Abra o arquivo `config.ini` e preencha:
-	- `bot_token = SEU_TOKEN`
-	- `chat_id = SEU_CHAT_ID`
-9. No aplicativo, abra a aba Config e clique em "Testar envio".
+**Para obter o token do bot:**
+1. Abra o Telegram e procure por `@BotFather`
+2. Envie `/newbot` e siga as instruções para criar o bot
+3. Copie o `token` que o BotFather enviar (formato: `123456:ABC...`)
 
-## Logs e Monitoramento
+**Para obter o chat_id:**
+4. Crie um grupo no Telegram (ou use conversa direta)
+5. Adicione o bot ao grupo
+6. Envie uma mensagem no grupo
+7. Procure por `@userinfobot` no Telegram e inicie
+8. Encaminhe para o `@userinfobot` uma mensagem do grupo
+9. O bot responderá com o `chat_id` (formato: `-123456789`)
+
+**Configurar no aplicativo:**
+10. Abra o aplicativo AlertaIntruso
+11. Vá para a aba **Config**
+12. Na seção Telegram, cole:
+    - **Bot Token**: `SEU_TOKEN`
+    - **Chat ID**: `SEU_CHAT_ID`
+13. Clique em **Salvar** (salva automaticamente no config.ini)
+14. Clique "Testar envio" → ✅ Receberá mensagem de teste no Telegram
 
 - **log.txt**: Logs rotativos (5MB, backup automático)
 - **fotos/**: Evidências por evento (EVENT_UID)
