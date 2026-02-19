@@ -756,7 +756,7 @@ class TelegramBot:
                 except Exception:
                     pass
 
-    def formatar_msg_inicio(self, cameras_ativas: int, versao: str) -> str:
+    def formatar_msg_inicio(self, cameras_ativas: int, versao: str, commit: str = "N/A") -> str:
         """Formata mensagem amigável de início do sistema."""
         return (
             f"✅ SISTEMA INICIADO\n"
@@ -764,6 +764,7 @@ class TelegramBot:
             f"🎥 Câmeras ativas: {cameras_ativas}\n"
             f"🚀 Status: Monitorando\n"
             f"v{versao}\n"
+            f"commit {commit}\n"
             f"{'━' * 8}"
         )
 
@@ -2843,7 +2844,7 @@ class InterfaceGrafica:
         mode = self.config["TELEGRAM"].get("alert_mode", "detections")
         if mode == "none":
             return
-        msg = self.telegram.formatar_msg_inicio(active_count, APP_VERSION)
+        msg = self.telegram.formatar_msg_inicio(active_count, APP_VERSION, get_commit_code())
         self.telegram.enviar_mensagem(msg)
 
     def _send_telegram_system_stop(self, total_detections: int):
