@@ -1546,108 +1546,374 @@ class RTSPObjectDetector:
 
 # ----------------------------- UI -----------------------------
 class InterfaceGrafica:
-    def __init__(self, root: tk.Tk):
+    def __init__(self, root):
         self.root = root
-        self.root.title(f"AlertaIntruso v{APP_VERSION} — 4 Câmeras RTSP (YOLO)")
-        self.root.geometry("1400x850")
-
+        # Inicialize primeiro a configuração
         self.config_file = Path("config.ini")
         self.config = configparser.ConfigParser()
+        self.config.read(self.config_file, encoding="utf-8")
 
-        self.log = LogManager("log.txt", max_size_mb=5)  # 5MB conforme padrão do guia
+        # Inicialize os frames principais
+        self.frame_scan = ttk.Frame(self.root)
+        self.frame_scan.pack(fill="both", expand=True)
 
-        # Queues precisam existir antes do callback do log
-        self.frame_queue = queue.Queue()
-        self.photo_queue = queue.Queue()
-        self.log_queue = queue.Queue()
+        # Só depois de tudo pronto, construa a interface da aba
+        self._build_scan_tab()
+    def _build_scan_tab(self):
+        """Cria a interface da aba de busca de câmeras RTSP na rede local."""
+        container = ttk.Frame(self.frame_scan)
+        container.pack(fill="both", expand=True, padx=10, pady=10)
 
-        self.log.add_callback(lambda line: self.log_queue.put(line))
+        left = ttk.Frame(container)
+        left.pack(side="left", fill="both", expand=True)
+        right = ttk.Frame(container)
+        right.pack(side="right", fill="y", padx=(20,0))
 
-        # Cabeçalho de inicialização padronizado (ESPECIFICACAO_LOGS.md)
-        separator = "=" * 80
-        self.log.log("INFO", separator)
-        self.log.log("INFO", f"Application: AlertaIntruso v{APP_VERSION}")
-        self.log.log("INFO", f"Python: {platform.python_version()}")
-        self.log.log("INFO", f"OS: {platform.system()} {platform.release()}")
-        self.log.log("INFO", f"OpenCV: {cv2.__version__}")
-        self.log.log("INFO", f"Working Directory: {Path.cwd()}")
-        self.log.log("INFO", separator)
+        label = ttk.Label(left, text="Buscar câmeras IP na rede local (porta RTSP 554)", font=("Arial", 12, "bold"))
+        label.pack(pady=(12, 8))
 
-        # Status do Scapy/Npcap é exibido apenas na guia Performance (sem log)
+        desc = ttk.Label(left, text="Clique em 'Buscar' para escanear a rede local e encontrar dispositivos com RTSP ativo.", foreground="#444444")
+        desc.pack(pady=(0, 10))
 
+        btn_scan = ttk.Button(left, text="Buscar Câmeras", command=self._scan_rtsp_cameras)
+        btn_scan.pack(pady=(0, 12))
+
+        columns = ("ip", "mac", "desc")
+        self.scan_result_tree = ttk.Treeview(left, columns=columns, show="headings", height=10)
+        self.scan_result_tree.heading("ip", text="IP")
+        self.scan_result_tree.heading("mac", text="MAC")
+        self.scan_result_tree.heading("desc", text="Descrição")
+        self.scan_result_tree.column("ip", width=120, anchor="center")
+        self.scan_result_tree.column("mac", width=140, anchor="center")
+        self.scan_result_tree.column("desc", width=260, anchor="w")
+        self.scan_result_tree.pack(padx=0, pady=(0, 10), fill="x")
+
+        self.btn_add_camera = ttk.Button(left, text="Adicionar à Configuração", state="disabled", command=self._add_selected_camera)
+        self.btn_add_camera.pack(pady=(0, 10))
+
+        self.scan_result_tree.bind('<<TreeviewSelect>>', self._on_scan_select)
+
+        # Campos usuário/senha
+        ttk.Label(right, text="Usuário:").pack(anchor="w")
+        self.scan_user = ttk.Entry(right, width=18)
+        self.scan_user.pack(anchor="w", pady=(0, 8))
+        self.scan_user.insert(0, self.config.get("SCAN", "user", fallback="admin"))
+
+        pass_frame = ttk.Frame(right)
+        pass_frame.pack(anchor="w", pady=(0, 8))
+        ttk.Label(pass_frame, text="Senha:").pack(side="left")
+        self.scan_pass = ttk.Entry(pass_frame, width=14, show="*")
+        self.scan_pass.pack(side="left")
+        self.scan_pass.insert(0, self.config.get("SCAN", "pass", fallback="senha"))
+
+        def save_scan_user_pass(event=None):
+            if "SCAN" not in self.config:
+                self.config["SCAN"] = {}
+            self.config["SCAN"]["user"] = self.scan_user.get().strip()
+            self.config["SCAN"]["pass"] = self.scan_pass.get().strip()
+            with open(self.config_file, "w", encoding="utf-8") as f:
+                self.config.write(f)
+        self.scan_user.bind("<FocusOut>", save_scan_user_pass)
+        self.scan_pass.bind("<FocusOut>", save_scan_user_pass)
+
+        self.show_pass_var = tk.BooleanVar(value=False)
+        def toggle_pass():
+            self.scan_pass.config(show="" if self.show_pass_var.get() else "*")
+        show_btn = ttk.Checkbutton(pass_frame, text="Visualizar", variable=self.show_pass_var, command=toggle_pass)
+        show_btn.pack(side="left", padx=(6,0))
+
+        self.btn_test_stream = ttk.Button(right, text="Testar Stream", command=self._test_scan_stream)
+        self.btn_test_stream.pack(anchor="w", pady=(12, 0))
+
+        self.test_frame_box = ttk.LabelFrame(right, text="Prévia da Imagem", padding=4)
+        self.test_frame_box.pack(anchor="w", pady=(8, 0), fill="both")
+        self.test_frame_label = ttk.Label(self.test_frame_box)
+        self.test_frame_label.pack()
+
+        ttk.Label(right, text="Caminho RTSP:").pack(anchor="w", pady=(10,0))
+        self.scan_path_var = tk.StringVar()
+        self.scan_path_combo = ttk.Combobox(right, textvariable=self.scan_path_var, width=32, state="readonly")
+        self.scan_path_combo.pack(anchor="w", pady=(0, 8))
+        self.scan_path_combo['values'] = []
+        self.scan_path_combo.set("")
+
+        self.show_pass_var = tk.BooleanVar(value=False)
+        def toggle_pass():
+            self.scan_pass.config(show="" if self.show_pass_var.get() else "*")
+        show_btn = ttk.Checkbutton(pass_frame, text="Visualizar", variable=self.show_pass_var, command=toggle_pass)
+        show_btn.pack(side="left", padx=(6,0))
+
+        # Botão Testar
+        self.btn_test_stream = ttk.Button(right, text="Testar Stream", command=self._test_scan_stream)
+        self.btn_test_stream.pack(anchor="w", pady=(12, 0))
+
+        self.test_frame_box = ttk.LabelFrame(right, text="Prévia da Imagem", padding=4)
+        self.test_frame_box.pack(anchor="w", pady=(8, 0), fill="both")
+        self.test_frame_label = ttk.Label(self.test_frame_box)
+        self.test_frame_label.pack()
+
+        ttk.Label(right, text="Caminho RTSP:").pack(anchor="w", pady=(10,0))
+        self.scan_path_var = tk.StringVar()
+        self.scan_path_combo = ttk.Combobox(right, textvariable=self.scan_path_var, width=32, state="readonly")
+        self.scan_path_combo.pack(anchor="w", pady=(0, 8))
+        self.scan_path_combo['values'] = []
+        self.scan_path_combo.set("")
+
+    def _scan_rtsp_cameras(self):
+        """Inicia busca real por câmeras RTSP na rede local (porta 554)."""
+        import threading, socket
+        from queue import Queue
+
+        for i in self.scan_result_tree.get_children():
+            self.scan_result_tree.delete(i)
+        self.btn_add_camera.config(state="disabled")
+        self.scan_result_tree.insert("", "end", values=("Buscando...", "", "Aguarde..."))
+        self.frame_scan.update_idletasks()
+
+        def get_local_base_ip():
+            try:
+                s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                s.connect(("8.8.8.8", 80))
+                ip = s.getsockname()[0]
+                s.close()
+                return ".".join(ip.split(".")[:3]) + "."
+            except Exception:
+                return "192.168.1."
+
+        def scan_ip(ip, port, timeout, result_queue):
+            try:
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.settimeout(timeout)
+                sock.connect((ip, port))
+                sock.close()
+                result_queue.put(ip)
+            except Exception:
+                pass
+
+        def scan_range():
+            base = get_local_base_ip()
+            port = 554
+            timeout = 0.5
+            threads = []
+            result_queue = Queue()
+            for i in range(1, 255):
+                ip = f"{base}{i}"
+                t = threading.Thread(target=scan_ip, args=(ip, port, timeout, result_queue))
+                t.daemon = True
+                t.start()
+                threads.append(t)
+            for t in threads:
+                t.join()
+            found = []
+            while not result_queue.empty():
+                found.append(result_queue.get())
+            # Ordenar IPs numericamente
+            def ip_key(ip):
+                return tuple(int(part) for part in ip.split("."))
+            found.sort(key=ip_key)
+            for i in self.scan_result_tree.get_children():
+                self.scan_result_tree.delete(i)
+            if found:
+                # Tentar obter MAC e descrição
+                import subprocess, socket
+                arp_table = {}
+                try:
+                    output = subprocess.check_output("arp -a", shell=True, encoding="utf-8", errors="ignore")
+                    for line in output.splitlines():
+                        parts = line.split()
+                        if len(parts) >= 2 and parts[1].count(":") >= 2:
+                            arp_table[parts[0]] = parts[1]
+                except Exception:
+                    pass
+                for ip in found:
+                    mac = arp_table.get(ip, "-")
+                    desc = "-"
+                    # Tentar hostname
+                    try:
+                        desc = socket.gethostbyaddr(ip)[0]
+                    except Exception:
+                        pass
+                    # Tentar identificar fabricante pelo MAC
+                    if mac != "-" and desc == "-":
+                        oui = mac.upper().replace(":","")[:6]
+                        # Pequeno dicionário de exemplos
+                        mac_vendors = {"001C7F": "Hikvision", "AC64DD": "Dahua", "000C29": "VMware", "A0C562": "Intelbras"}
+                        if oui in mac_vendors:
+                            desc = mac_vendors[oui]
+                    self.scan_result_tree.insert("", "end", values=(ip, mac, desc))
+            else:
+                self.scan_result_tree.insert("", "end", values=("Nenhuma câmera encontrada", "", ""))
+            self.btn_add_camera.config(state="disabled")
+
+        threading.Thread(target=scan_range, daemon=True).start()
+
+    def _on_scan_select(self, event):
+        sel = self.scan_result_tree.selection()
+        if sel:
+            self.btn_add_camera.config(state="normal")
+            ip = self.scan_result_tree.item(sel[0])['values'][0]
+            if not ip or "câmera" in str(ip).lower() or ip == "Buscando...":
+                self.btn_add_camera.config(state="disabled")
+                self.scan_path_combo['values'] = []
+                self.scan_path_combo.set("")
+                return
+            user = self.scan_user.get().strip() or "admin"
+            pwd = self.scan_pass.get().strip() or "senha"
+            caminhos = [
+                f"/stream1",
+                f"/h264",
+                f"/live",
+                f"/cam/realmonitor?channel=1&subtype=0",
+                f":554/Streaming/Channels/101/",
+                f"/user={user}&password={pwd}&channel=1&stream=0.sdp?real_stream",
+                f"/axis-media/media.amp",
+                f"/mpeg4",
+                f"/video",
+            ]
+            self.scan_path_combo['values'] = caminhos
+            if not self.scan_path_var.get() or self.scan_path_var.get() not in caminhos:
+                self.scan_path_combo.set(caminhos[0])
+        else:
+            self.btn_add_camera.config(state="disabled")
+            self.scan_path_combo['values'] = []
+            self.scan_path_combo.set("")
+
+    def _add_selected_camera(self):
+        sel = self.scan_result_tree.selection()
+        if not sel:
+            return
+        ip = self.scan_result_tree.item(sel[0])['values'][0]
+        if not ip or "câmera" in str(ip).lower() or ip == "Buscando...":
+            return
+        if ":" in ip:
+            ip = ip.split()[0]
+        user = self.scan_user.get().strip() or "admin"
+        pwd = self.scan_pass.get().strip() or "senha"
+        path = self.scan_path_var.get().strip() or "/stream1"
+        # Monta URL RTSP
+        if path.startswith(":554"):
+            # Caminho que já inclui porta
+            rtsp_url = f"rtsp://{user}:{pwd}@{ip}{path}"
+        elif path.startswith("/user="):
+            # Caminho com user e senha no path
+            rtsp_url = f"rtsp://{ip}{path}"
+        else:
+            rtsp_url = f"rtsp://{user}:{pwd}@{ip}{path}"
+        campos = [self.e_rtsp1, self.e_rtsp2, self.e_rtsp3, self.e_rtsp4]
+        for campo in campos:
+            if not campo.get().strip():
+                campo.delete(0, tk.END)
+                campo.insert(0, rtsp_url)
+                messagebox.showinfo("Câmera adicionada", f"URL adicionada: {rtsp_url}")
+                return
+        if messagebox.askyesno("Todos preenchidos", "Todos os campos RTSP estão preenchidos. Deseja sobrescrever CAM1?"):
+            self.e_rtsp1.delete(0, tk.END)
+            self.e_rtsp1.insert(0, rtsp_url)
+            messagebox.showinfo("Câmera adicionada", f"URL adicionada em CAM1: {rtsp_url}")
+
+    def _test_scan_stream(self):
+        import cv2
+        ip = None
+        sel = self.scan_result_tree.selection()
+        if sel:
+            ip = self.scan_result_tree.item(sel[0])['values'][0]
+            if not ip or "câmera" in str(ip).lower() or ip == "Buscando...":
+                messagebox.showerror("Teste de Stream", "Selecione uma câmera válida na lista.")
+                return
+            if ":" in ip:
+                ip = ip.split()[0]
+        user = self.scan_user.get().strip() or "admin"
+        pwd = self.scan_pass.get().strip() or "senha"
+        path = self.scan_path_var.get().strip() or "/stream1"
+        if not ip:
+            messagebox.showerror("Teste de Stream", "Selecione uma câmera na lista.")
+            return
+        if path.startswith(":554"):
+            rtsp_url = f"rtsp://{user}:{pwd}@{ip}{path}"
+        elif path.startswith("/user="):
+            rtsp_url = f"rtsp://{ip}{path}"
+        else:
+            rtsp_url = f"rtsp://{user}:{pwd}@{ip}{path}"
+        self.test_frame_label.config(text="Testando stream...")
+        self.frame_scan.update_idletasks()
         try:
-            cv2.setLogCallback(lambda level, msg: self.log.log("INFO", f"OpenCV [{level}]: {msg.strip()}"))
-        except Exception:
-            self.log.log("WARN", "cv2.setLogCallback não disponível. Logs do OpenCV não serão capturados.")
+            cap = cv2.VideoCapture(rtsp_url)
+            ret, frame = cap.read()
+            cap.release()
+            if ret and frame is not None and hasattr(frame, "size") and frame.size > 0:
+                # Mostrar frame reduzido
+                import PIL.Image, PIL.ImageTk
+                img = PIL.Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+                img = img.resize((180, 120))
+                img_tk = PIL.ImageTk.PhotoImage(img)
+                self.test_frame_label.config(image=img_tk, text="")
+                self.test_frame_label.image = img_tk
+                self.log.log("INFO", f"Teste RTSP OK: {rtsp_url}")
+            else:
+                self.test_frame_label.config(image="", text="Falha ao obter frame.")
+                self.log.log("ERROR", f"Teste RTSP falhou: {rtsp_url}")
+                messagebox.showerror("Teste de Stream", f"Falha ao obter frame da stream RTSP.\nURL: {rtsp_url}")
+        except Exception as e:
+            self.test_frame_label.config(image="", text="Erro ao testar stream.")
+            self.log.log("ERROR", f"Teste RTSP erro: {rtsp_url} | {e}")
+            messagebox.showerror("Teste de Stream", f"Erro ao testar stream RTSP.\nURL: {rtsp_url}\nErro: {e}")
+        idx = self.scan_result_list.curselection()
+        if not idx:
+            return
+        ip = self.scan_result_list.get(idx[0])
+        if ":" in ip:
+            ip = ip.split()[0]
+        user = self.scan_user.get().strip() or "admin"
+        pwd = self.scan_pass.get().strip() or "senha"
+        path = self.scan_path_var.get().strip() or "/stream1"
+        # Monta URL RTSP
+        if path.startswith(":554"):
+            # Caminho que já inclui porta
+            rtsp_url = f"rtsp://{user}:{pwd}@{ip}{path}"
+        elif path.startswith("/user="):
+            # Caminho com user e senha no path
+            rtsp_url = f"rtsp://{ip}{path}"
+        else:
+            rtsp_url = f"rtsp://{user}:{pwd}@{ip}{path}"
+        campos = [self.e_rtsp1, self.e_rtsp2, self.e_rtsp3, self.e_rtsp4]
+        for campo in campos:
+            if not campo.get().strip():
+                campo.delete(0, tk.END)
+                campo.insert(0, rtsp_url)
+                messagebox.showinfo("Câmera adicionada", f"URL adicionada: {rtsp_url}")
+                return
+        if messagebox.askyesno("Todos preenchidos", "Todos os campos RTSP estão preenchidos. Deseja sobrescrever CAM1?"):
+            self.e_rtsp1.delete(0, tk.END)
+            self.e_rtsp1.insert(0, rtsp_url)
+            messagebox.showinfo("Câmera adicionada", f"URL adicionada em CAM1: {rtsp_url}")
 
-        self.old_stderr = sys.stderr
-        try:
-            r, w = os.pipe()
-            self.stderr_r = os.fdopen(r, "r")
-            sys.stderr = os.fdopen(w, "w")
-            threading.Thread(target=self._read_stderr, daemon=True).start()
-        except Exception:
-            self.log.log("WARN", "Falha ao redirecionar stderr. Prosseguindo sem captura.")
+            def _on_scan_select(self, event):
+                if self.scan_result_list.curselection():
+                    self.btn_add_camera.config(state="normal")
+                else:
+                    self.btn_add_camera.config(state="disabled")
 
-        self._load_or_create_config()
-        self.cam_status_labels = {}
-        self.cam_transport_labels = {}
-        self.cam_rtsp_labels = {}
-        self._apply_rtsp_transport_from_config()
-
-        token = self.config["TELEGRAM"].get("bot_token", "")
-        chat_id = self.config["TELEGRAM"].get("chat_id", "")
-        self.telegram = TelegramBot(token, chat_id, self.log)
-        self.log.set_telegram(self.telegram)
-
-        self.detectors: Dict[int, RTSPObjectDetector] = {}
-        self.threads: Dict[int, threading.Thread] = {}
-        self.running = False
-
-        # Network Monitor (captura RTP para taxa real)
-        self.network_monitor = NetworkMonitor()
-
-        # Watchdog (monotonic)
-        self.watchdog_interval_ms = 2000
-        self.watchdog_no_frame_s = 20.0  # Aumentado de 12s para 20s (rede instável)
-        self.watchdog_restart_backoff_s = 10.0
-        self._last_restart_mono: Dict[int, float] = {}
-
-        self._last_daily_restart_date = None
-
-        self.notebook = ttk.Notebook(self.root)
-        self.notebook.pack(fill="both", expand=True, padx=5, pady=5)
-
-        self.frame_video = ttk.Frame(self.notebook)
-        self.notebook.add(self.frame_video, text="Vídeo (Mosaico 2x2)")
-        self._build_video_mosaic()
-        self._apply_rtsp_transport_from_config()
-
-        self.frame_config = ttk.Frame(self.notebook)
-        self.notebook.add(self.frame_config, text="Config")
-        self._build_config_tab()
-
-        self.frame_fotos = ttk.Frame(self.notebook)
-        self.notebook.add(self.frame_fotos, text="Fotos")
-        self._build_photos_tab()
-        self._load_existing_photos()  # Carregar fotos já salvas
-
-        self.frame_logs = ttk.Frame(self.notebook)
-        self.notebook.add(self.frame_logs, text="Logs")
-        self._build_logs_tab()
-
-        self.frame_performance = ttk.Frame(self.notebook)
-        self.notebook.add(self.frame_performance, text="Performance")
-        self._build_performance_tab()
-
-        self.frame_about = ttk.Frame(self.notebook)
-        self.notebook.add(self.frame_about, text="Sobre")
-        self._build_about_tab()
-
-        self._load_logs_tail()
-        self.root.after(1000, self._update_performance)
-
-        self._process_queues()
+            def _add_selected_camera(self):
+                idx = self.scan_result_list.curselection()
+                if not idx:
+                    return
+                ip = self.scan_result_list.get(idx[0])
+                if ":" in ip:
+                    ip = ip.split()[0]  # Remove qualquer texto extra
+                rtsp_url = f"rtsp://admin:senha@{ip}/stream1"
+                # Preencher o próximo campo vazio na aba Config
+                campos = [self.e_rtsp1, self.e_rtsp2, self.e_rtsp3, self.e_rtsp4]
+                for campo in campos:
+                    if not campo.get().strip():
+                        campo.delete(0, tk.END)
+                        campo.insert(0, rtsp_url)
+                        messagebox.showinfo("Câmera adicionada", f"URL adicionada: {rtsp_url}\n\nEdite usuário/senha se necessário.")
+                        return
+                # Se todos preenchidos, perguntar se deseja sobrescrever CAM1
+                if messagebox.askyesno("Todos preenchidos", "Todos os campos RTSP estão preenchidos. Deseja sobrescrever CAM1?"):
+                    self.e_rtsp1.delete(0, tk.END)
+                    self.e_rtsp1.insert(0, rtsp_url)
+                    messagebox.showinfo("Câmera adicionada", f"URL adicionada em CAM1: {rtsp_url}\n\nEdite usuário/senha se necessário.")
         self.log.log("INFO", "UI initialized successfully")
 
         self.root.after(600, self.start_system)
@@ -1840,7 +2106,7 @@ class InterfaceGrafica:
             ttk.Label(header, text=f"CAM{cam_id}", font=("Arial", 10, "bold")).pack(side="left", padx=(0, 2), pady=2)
 
             # RTSP transport label
-            transport = self.config["DETECTOR"].get("rtsp_transport", "udp").strip().upper()
+            transport = self.config["DETECTOR"].get("rtsp_transport", "udp").strip().upper() if "DETECTOR" in self.config else "UDP"
             self.cam_transport_labels[cam_id] = ttk.Label(header, text=f"({transport})", foreground="#666666")
             self.cam_transport_labels[cam_id].pack(side="left", padx=(0, 6), pady=2)
 
@@ -2942,6 +3208,17 @@ class InterfaceGrafica:
             3: self.config["CAM3"].get("rtsp_url", "").strip(),
             4: self.config["CAM4"].get("rtsp_url", "").strip(),
         }
+
+        # Listar URLs RTSP ativas
+        active_rtsp = [(cam_id, url) for cam_id, url in urls.items() if url]
+        if active_rtsp:
+            msg = "RTSPs ativos na inicialização:\n" + "\n".join([f"CAM{cam_id}: {url}" for cam_id, url in active_rtsp])
+        else:
+            msg = "Nenhuma URL RTSP ativa na inicialização."
+        # Envia para Telegram e loga
+        if self.telegram and self.telegram.enabled:
+            self.telegram.enviar_mensagem(msg)
+        self.log.log("INFO", msg)
 
         # Iniciar Network Monitor para captura de taxa real
         enabled_urls = {cam_id: url for cam_id, url in urls.items() if url}

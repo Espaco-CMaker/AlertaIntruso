@@ -31,6 +31,13 @@ O **AlertaIntruso** é uma aplicação desktop em Python desenvolvida para monit
 
 ## Abas da Interface
 
+
+### Busca de Câmeras
+- Nova aba "Buscar Câmeras" para escanear a rede local e encontrar câmeras IP transmitindo na porta RTSP (554)
+- Exibe lista de IPs encontrados com RTSP ativo
+- Permite adicionar rapidamente uma câmera detectada à configuração
+- Útil para facilitar a configuração inicial e encontrar câmeras desconhecidas
+
 ### Vídeo
 - Mosaico 2x2 redimensionável
 - Overlays com bounding boxes, classe, confiança, timestamp

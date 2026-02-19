@@ -90,3 +90,13 @@ Expandir opções de notificação no Telegram permitindo escolher entre envio d
 
 _(Funcionalidades movidas para cá quando implementadas)_
 
+---
+
+# Melhorias sugeridas
+
+- Inserir em cada câmera a opção de prioridades:
+  - Câmeras com prioridade alta devem possuir a borda vermelha na interface.
+  - A mensagem enviada no Telegram deve ter o fundo vermelho para prioridade 1, 2, 3; e fundo laranja para prioridade 2.
+  - A prioridade será configurada na guia de configurações.
+- Cada câmera terá um checkbox para habilitar ou não a emissão de som.
+
