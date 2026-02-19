@@ -196,6 +196,7 @@ import urllib.request
 import requests
 import webbrowser
 import json
+import subprocess
 from datetime import datetime
 from pathlib import Path
 import time
@@ -246,6 +247,23 @@ set_ffmpeg_capture_options("udp")
 
 APP_VERSION = "4.5.5"
 MAX_THUMBS = 200
+
+
+def get_commit_code() -> str:
+    """Retorna hash curto do commit atual; fora do git retorna N/A."""
+    try:
+        repo_dir = Path(__file__).resolve().parent
+        out = subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=str(repo_dir),
+            stderr=subprocess.DEVNULL,
+            timeout=2,
+            text=True,
+        )
+        commit = (out or "").strip()
+        return commit if commit else "N/A"
+    except Exception:
+        return "N/A"
 
 # ----------------------------- Tips do Menu de Configurações -----------------------------
 CONFIGURATION_TIPS = {
@@ -2348,6 +2366,7 @@ class InterfaceGrafica:
 
     def _build_about_tab(self):
         ttk.Label(self.frame_about, text=f"Versão: {APP_VERSION}", font=("Arial", 12, "bold")).pack(pady=10)
+        ttk.Label(self.frame_about, text=f"Commit: {get_commit_code()}", font=("Arial", 10)).pack(pady=2)
         ttk.Label(self.frame_about, text="Autor: Fabio Bettio", font=("Arial", 10)).pack(pady=5)
         ttk.Label(self.frame_about, text="Data:           02/02/2026", font=("Arial", 10)).pack(pady=5)
         ttk.Label(self.frame_about, text="Licença: Uso educacional/experimental", font=("Arial", 10)).pack(pady=5)
