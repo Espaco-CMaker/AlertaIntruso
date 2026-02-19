@@ -1,5 +1,9 @@
-# CHANGELOG - AlertaIntruso
+﻿# CHANGELOG - AlertaIntruso
 
+## v4.5.6 (19/02/2026)
+### ✅ Hotfix: versão + commit visível
+- **NOVO**: Aba **Sobre** exibe o hash curto do commit atual
+- **NOVO**: Mensagem de início do sistema no Telegram inclui versão e commit
 ## v4.5.5 (04/02/2026)
 ### ✅ Aceite & Estabilização
 - **FIX**: `photo_callback` e fila de fotos corrigidos (inclui `crop_path`)
@@ -139,3 +143,4 @@
 - Taxa de transferência em Mbps/MB/s
 - Logs coloridos (ERROR em vermelho, WARN em laranja)
 - Métricas avançadas de rede na aba Performance
+

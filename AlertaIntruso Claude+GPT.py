@@ -1,11 +1,11 @@
-"""
+﻿"""
 ================================================================================
 ALERTAINTRUSO — ALARME INTELIGENTE POR VISÃO COMPUTACIONAL (RTSP • YOLO • MULTICAM)
 ================================================================================
 Arquivo:        AlertaIntruso Claude+GPT.py
 Projeto:        Sistema de Alarme Inteligente por Visão Computacional
-Versão:         4.5.5
-Data:           04/02/2026
+Versão:         4.5.6
+Data:           19/02/2026
 Autor:          Fabio Bettio
 Licença:        Uso educacional / experimental
 Status:         ESTÁVEL
@@ -22,6 +22,9 @@ de movimento.
 ================================================================================
 Changelog completo
 ================================================================================
+v4.5.6 (19/02/2026) [HOTFIX] (linhas: 0)
+    - NOVO: Aba Sobre exibe código do commit atual
+    - MELHORIA: Mensagem de inicialização no Telegram inclui commit
 
 v4.5.5 (04/02/2026) [ACEITE - ESTABILIZAÇÃO] (linhas: 0)
     - FIX: Callback de foto e fila corrigidos (crop_path) + método enviar_grupo_fotos()
@@ -245,7 +248,7 @@ def set_ffmpeg_capture_options(transport: str = "udp") -> None:
 
 set_ffmpeg_capture_options("udp")
 
-APP_VERSION = "4.5.5"
+APP_VERSION = "4.5.6"
 MAX_THUMBS = 200
 
 
@@ -3164,3 +3167,4 @@ if __name__ == "__main__":
         traceback.print_exc()
         input("Pressione Enter para sair...")
         raise
+
