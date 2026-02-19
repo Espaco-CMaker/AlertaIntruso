@@ -1,6 +1,6 @@
 # AlertaIntruso - Sistema de Alarme Inteligente por Visão Computacional
 
-**Versão Atual: 4.5.7** (10/02/2026)
+**Versão Atual: 4.5.8** (19/02/2026)
 
 ## Descrição Geral
 
@@ -141,12 +141,16 @@ Edite `config.ini`:
 
 ## Desenvolvimento
 
-- **Versão**: 4.5.7
-- **Data**: 10/02/2026
+- **Versão**: 4.5.8
+- **Data**: 19/02/2026
 - **Autor**: Fabio Bettio
 - **Licença**: Uso educacional/experimental
 
 ## Changelog (Últimas 20 Versões)
+
+### v4.5.8 (19/02/2026) - Release de Versionamento
+- Incremento de versão do projeto para 4.5.8
+- Sincronização de arquivos principais para novo release
 
 ### v4.5.7 (10/02/2026) - Correções e Melhorias de UX
 - Scroll do mouse habilitado na aba Fotos (MouseWheel binding)
