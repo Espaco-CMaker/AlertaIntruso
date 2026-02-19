@@ -22,7 +22,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='AlertaIntruso-v4.5.8',
+    name='AlertaIntruso-v4.5.7',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

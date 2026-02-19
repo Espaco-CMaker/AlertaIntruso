@@ -1,13 +1,13 @@
-# AlertaIntruso v4.5.8 - Status Report
+# AlertaIntruso v4.5.7 - Status Report
 
-**Data**: 19/02/2026  
-**Versão**: 4.5.8  
+**Data**: 10/02/2026  
+**Versão**: 4.5.7  
 **Status**: ✅ ESTÁVEL
 
 ## Sessão de Desenvolvimento
 
 ### Período
-04/02/2026 - v4.3.16 → v4.5.8 (padronização + aceite + validação + UX)
+04/02/2026 - v4.3.16 → v4.5.7 (padronização + aceite + validação + UX)
 
 ### Objetivos Alcançados
 

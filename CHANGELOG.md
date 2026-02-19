@@ -1,10 +1,5 @@
 # CHANGELOG - AlertaIntruso
 
-## v4.5.8 (19/02/2026)
-### ✅ Release de Versionamento
-- **CHORE**: Incremento de versão para 4.5.8
-- **DOC**: Sincronização de APP_VERSION, README e status do projeto
-
 ## v4.5.7 (10/02/2026)
 ### ✅ Correções e Melhorias de UX
 - **FIX**: Scroll do mouse habilitado na aba Fotos (MouseWheel binding)
