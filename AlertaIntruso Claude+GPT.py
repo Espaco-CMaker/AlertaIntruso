@@ -755,6 +755,10 @@ class RTSPObjectDetector:
         self.presence_exit_timeout_s = 3.0
         self.presence_mid_alert_after_s = 20.0
         self.presence_min_move_px = 25.0
+        self.presence_enter_confirm_frames = 3
+        self.presence_exit_confirm_frames = 10
+        self.presence_rearm_radius_px = 90.0
+        self.presence_rearm_clear_absence_s = 8.0
         self._presence_active = False
         self._presence_mid_sent = False
         self._presence_start_mono = 0.0
@@ -763,6 +767,11 @@ class RTSPObjectDetector:
         self._presence_last_frame_draw = None
         self._presence_last_frame_clean = None
         self._presence_last_boxes = []
+        self._presence_seen_streak = 0
+        self._presence_miss_streak = 0
+        self._presence_latch_active = False
+        self._presence_latch_center = None
+        self._presence_latch_last_seen_mono = 0.0
 
         # Capturas por evento (monotonic)
         self._last_shot_time = 0.0
@@ -1142,6 +1151,11 @@ class RTSPObjectDetector:
             self._presence_last_frame_draw = None
             self._presence_last_frame_clean = None
             self._presence_last_boxes = []
+            self._presence_seen_streak = 0
+            self._presence_miss_streak = 0
+            self._presence_latch_active = False
+            self._presence_latch_center = None
+            self._presence_latch_last_seen_mono = 0.0
             self.last_frame_mono = 0.0
             self.last_frame_wall_ts = 0.0
             self.log.log("INFO", "Soft reconnect completed successfully", self.cam_id)
@@ -1234,16 +1248,36 @@ class RTSPObjectDetector:
                 frame_draw = self._draw_boxes(frame, boxes, confs, cids)
 
                 person_present = bool(boxes and self._person_present(cids))
+                largest_person = self._largest_person_box(boxes, cids) if person_present else None
+                person_center = self._box_center(largest_person) if largest_person is not None else None
+
                 if person_present:
+                    self._presence_seen_streak += 1
+                    self._presence_miss_streak = 0
                     self._presence_last_seen_mono = now_mono
                     self._presence_last_frame_draw = frame_draw.copy()
                     self._presence_last_frame_clean = frame.copy()
                     self._presence_last_boxes = [list(b) for b in boxes]
 
-                    largest_person = self._largest_person_box(boxes, cids)
-                    person_center = self._box_center(largest_person) if largest_person is not None else None
+                    if self._presence_latch_active:
+                        self._presence_latch_last_seen_mono = now_mono
+                        if (self._presence_latch_center is not None) and (person_center is not None):
+                            moved = self._distance_px(person_center, self._presence_latch_center)
+                            if moved > (self.presence_rearm_radius_px * 1.5):
+                                self._presence_latch_active = False
+                                self._presence_latch_center = None
 
-                    if not self._presence_active and (now_mono - self._last_event_time) >= self.cooldown_s:
+                    can_enter = (
+                        (not self._presence_active)
+                        and (self._presence_seen_streak >= self.presence_enter_confirm_frames)
+                        and ((now_mono - self._last_event_time) >= self.cooldown_s)
+                    )
+
+                    blocked_by_latch = False
+                    if self._presence_latch_active and (self._presence_latch_center is not None) and (person_center is not None):
+                        blocked_by_latch = self._distance_px(person_center, self._presence_latch_center) <= self.presence_rearm_radius_px
+
+                    if can_enter and (not blocked_by_latch):
                         evt_ts = int(time.time())
                         self._event_uid = f"{self.cam_id}-{evt_ts}-{self.detections_total + 1}"
                         self._event_conf_avg = (sum(confs) / len(confs)) if confs else 0.0
@@ -1253,6 +1287,10 @@ class RTSPObjectDetector:
                         self._presence_enter_center = person_center
                         self._last_event_time = now_mono
                         self.detections_total += 1
+
+                        self._presence_latch_active = True
+                        self._presence_latch_center = person_center
+                        self._presence_latch_last_seen_mono = now_mono
 
                         person_count = sum(1 for cid in cids if cid == 0)
                         detected_class_names = []
@@ -1280,30 +1318,41 @@ class RTSPObjectDetector:
                             )
                             self._presence_mid_sent = True
                             self.log.log("INFO", f"EVENTO MEIO | evt={self._event_uid} | v{APP_VERSION}", self.cam_id)
-                elif self._presence_active:
-                    since_seen = now_mono - self._presence_last_seen_mono
-                    if since_seen >= self.presence_exit_timeout_s:
-                        if self._presence_last_frame_draw is not None and self._presence_last_frame_clean is not None:
-                            self._save_and_notify(
-                                self._presence_last_frame_draw,
-                                self._presence_last_frame_clean,
-                                self._presence_last_boxes,
-                                self._event_uid,
-                                3,
-                                0,
-                                self._event_conf_avg,
-                                ["saida"],
-                                alert_stage="SAÍDA",
-                            )
-                        self.log.log("INFO", f"EVENTO SAÍDA | evt={self._event_uid} | v{APP_VERSION}", self.cam_id)
-                        self._presence_active = False
-                        self._presence_mid_sent = False
-                        self._presence_start_mono = 0.0
-                        self._presence_last_seen_mono = 0.0
-                        self._presence_enter_center = None
-                        self._presence_last_frame_draw = None
-                        self._presence_last_frame_clean = None
-                        self._presence_last_boxes = []
+                else:
+                    self._presence_miss_streak += 1
+                    self._presence_seen_streak = 0
+
+                    if self._presence_active:
+                        since_seen = now_mono - self._presence_last_seen_mono
+                        if (since_seen >= self.presence_exit_timeout_s) and (self._presence_miss_streak >= self.presence_exit_confirm_frames):
+                            if self._presence_last_frame_draw is not None and self._presence_last_frame_clean is not None:
+                                self._save_and_notify(
+                                    self._presence_last_frame_draw,
+                                    self._presence_last_frame_clean,
+                                    self._presence_last_boxes,
+                                    self._event_uid,
+                                    3,
+                                    0,
+                                    self._event_conf_avg,
+                                    ["saida"],
+                                    alert_stage="SAÍDA",
+                                )
+                            self.log.log("INFO", f"EVENTO SAÍDA | evt={self._event_uid} | v{APP_VERSION}", self.cam_id)
+                            self._presence_active = False
+                            self._presence_mid_sent = False
+                            self._presence_start_mono = 0.0
+                            self._presence_last_seen_mono = 0.0
+                            self._presence_enter_center = None
+                            self._presence_last_frame_draw = None
+                            self._presence_last_frame_clean = None
+                            self._presence_last_boxes = []
+                            self._presence_miss_streak = 0
+
+                    if self._presence_latch_active:
+                        clear_for = now_mono - self._presence_latch_last_seen_mono
+                        if clear_for >= self.presence_rearm_clear_absence_s:
+                            self._presence_latch_active = False
+                            self._presence_latch_center = None
 
                 if self.frame_callback:
                     try:
@@ -1447,6 +1496,10 @@ class InterfaceGrafica:
                 "presence_exit_timeout_s": "3.0",
                 "presence_mid_alert_after_s": "20.0",
                 "presence_min_move_px": "25.0",
+                "presence_enter_confirm_frames": "3",
+                "presence_exit_confirm_frames": "10",
+                "presence_rearm_radius_px": "90.0",
+                "presence_rearm_clear_absence_s": "8.0",
                 "skip_frames": "2",  # Pula 2 frames (processa 1 a cada 3) - melhora performance
                 "input_size": "320",  # Resolução YOLO (320=rápido, 416=preciso, 608=lento)
                 "rtsp_transport": "udp",  # UDP (padrão) ou TCP
@@ -2421,6 +2474,10 @@ class InterfaceGrafica:
         det.presence_exit_timeout_s = float(self.config["DETECTOR"].get("presence_exit_timeout_s", "3.0"))
         det.presence_mid_alert_after_s = float(self.config["DETECTOR"].get("presence_mid_alert_after_s", "20.0"))
         det.presence_min_move_px = float(self.config["DETECTOR"].get("presence_min_move_px", "25.0"))
+        det.presence_enter_confirm_frames = int(self.config["DETECTOR"].get("presence_enter_confirm_frames", "3"))
+        det.presence_exit_confirm_frames = int(self.config["DETECTOR"].get("presence_exit_confirm_frames", "10"))
+        det.presence_rearm_radius_px = float(self.config["DETECTOR"].get("presence_rearm_radius_px", "90.0"))
+        det.presence_rearm_clear_absence_s = float(self.config["DETECTOR"].get("presence_rearm_clear_absence_s", "8.0"))
         det.skip_frames = int(self.config["DETECTOR"].get("skip_frames", "2"))
         det.input_size = int(self.config["DETECTOR"].get("input_size", "320"))
         det.max_photos_keep = int(self.config["DETECTOR"].get("max_photos_keep", "500"))
