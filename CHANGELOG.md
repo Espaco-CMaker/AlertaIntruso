@@ -1,5 +1,12 @@
 ﻿# CHANGELOG - AlertaIntruso
 
+## v4.5.8 (20/02/2026)
+### ✅ Aceite de Versao
+- **ITEM**: MODIFICADO: Remocao da guia Performance e respectivas funcoes
+- **ITEM**: ALTERADO: Adicionado script accept_release.py para automacao de aceite
+- **ITEM**: CORRIGIDO: Removidas referencias e integracoes obsoletas de metricas
+- **COMMIT**: pending
+
 ## v4.5.6 (19/02/2026)
 ### ✅ Hotfix: versão + commit visível
 - **NOVO**: Aba **Sobre** exibe o hash curto do commit atual

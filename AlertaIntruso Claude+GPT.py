@@ -1,11 +1,11 @@
-﻿"""
+"""
 ================================================================================
 ALERTAINTRUSO — ALARME INTELIGENTE POR VISÃO COMPUTACIONAL (RTSP • YOLO • MULTICAM)
 ================================================================================
 Arquivo:        AlertaIntruso Claude+GPT.py
 Projeto:        Sistema de Alarme Inteligente por Visão Computacional
-Versão:         4.5.6
-Data:           19/02/2026
+Versão:         4.5.8
+Data:           20/02/2026
 Autor:          Fabio Bettio
 Licença:        Uso educacional / experimental
 Status:         ESTÁVEL
@@ -22,6 +22,16 @@ de movimento.
 ================================================================================
 Changelog completo
 ================================================================================
+v4.5.8 (20/02/2026) [ACEITE] (linhas: 0)
+    - MODIFICADO: Remocao da guia Performance e respectivas funcoes
+    - ALTERADO: Adicionado script accept_release.py para automacao de aceite
+    - CORRIGIDO: Removidas referencias e integracoes obsoletas de metricas
+
+v4.5.7 (20/02/2026) [ACEITE] (linhas: 0)
+    - MODIFICADO: Remocao da guia Performance e respectivas funcoes
+    - ALTERADO: Adicionado script accept_release.py para automacao de aceite
+    - CORRIGIDO: Removidas referencias e integracoes obsoletas de metricas
+
 v4.5.6 (19/02/2026) [HOTFIX] (linhas: 0)
     - NOVO: Aba Sobre exibe código do commit atual
     - MELHORIA: Mensagem de inicialização no Telegram inclui commit
@@ -213,21 +223,6 @@ except ImportError:
     psutil = None
     PSUTIL_AVAILABLE = False
 
-try:
-    import warnings
-    # Suprimir warning do scapy sobre libpcap (será logado posteriormente)
-    with warnings.catch_warnings():
-        warnings.filterwarnings("ignore", message=".*libpcap.*")
-        from scapy.all import sniff, IP, UDP  # type: ignore
-    SCAPY_AVAILABLE = True
-    SCAPY_WARNING = None
-except ImportError:
-    SCAPY_AVAILABLE = False
-    SCAPY_WARNING = None
-except Exception as e:
-    SCAPY_AVAILABLE = False
-    SCAPY_WARNING = str(e)
-
 import tkinter as tk
 from tkinter import ttk, scrolledtext, messagebox
 from PIL import Image, ImageTk, ImageDraw
@@ -248,7 +243,7 @@ def set_ffmpeg_capture_options(transport: str = "udp") -> None:
 
 set_ffmpeg_capture_options("udp")
 
-APP_VERSION = "4.5.6"
+APP_VERSION = "4.5.8"
 MAX_THUMBS = 200
 
 
@@ -293,104 +288,6 @@ CONFIGURATION_TIPS = {
     "alert_mode": "Tipo de alerta: 'all' = eventos de sistema + fotos, 'detections' = somente fotos, 'none' = desativado",
     "rtsp_transport": "Transporte RTSP: 'udp' (padrão, menor latência) ou 'tcp' (mais estável em redes instáveis)",
 }
-
-
-# ----------------------------- Network Monitor (RTP) -----------------------------
-class NetworkMonitor:
-    """Monitora tráfego RTP para calcular taxa real de transferência"""
-    def __init__(self):
-        self.cam_bitrates: Dict[int, float] = {cam_id: 0.0 for cam_id in range(1, 5)}
-        self.cam_packet_counts: Dict[int, int] = {cam_id: 0 for cam_id in range(1, 5)}
-        self.cam_last_bytes: Dict[int, int] = {cam_id: 0 for cam_id in range(1, 5)}
-        self.cam_last_time: Dict[int, float] = {cam_id: 0.0 for cam_id in range(1, 5)}
-        self.running = False
-        self.rtsp_urls: Dict[int, str] = {}
-        self.rtsp_ports: Dict[int, int] = {}
-        self.sniffer_thread = None
-
-    def start(self, rtsp_urls: Dict[int, str]):
-        """Inicia captura de pacotes RTP em thread separada"""
-        if not SCAPY_AVAILABLE:
-            return
-
-        self.rtsp_urls = rtsp_urls
-        # Extrair portas das URLs RTSP
-        import re
-        for cam_id, url in rtsp_urls.items():
-            match = re.search(r':(\d+)(?:/|$)', url)
-            self.rtsp_ports[cam_id] = int(match.group(1)) if match else 554
-
-        self.running = True
-        self.sniffer_thread = threading.Thread(target=self._packet_sniffer, daemon=True)
-        self.sniffer_thread.start()
-
-    def stop(self):
-        """Para captura de pacotes"""
-        self.running = False
-        if self.sniffer_thread:
-            try:
-                self.sniffer_thread.join(timeout=2)
-            except Exception:
-                pass
-
-    def _packet_sniffer(self):
-        """Captura pacotes UDP/RTP em segundo plano"""
-        if not SCAPY_AVAILABLE:
-            return
-
-        try:
-            def packet_callback(packet):
-                if not self.running:
-                    return
-
-                if not packet.haslayer(UDP):
-                    return
-
-                try:
-                    src_port = packet[UDP].sport
-                    dst_port = packet[UDP].dport
-                    payload_len = len(packet[UDP].payload) if packet[UDP].payload else 0
-
-                    # Associar pacotes aos IDs das câmeras por porta
-                    for cam_id, port_range in [(1, range(5000, 5010)), (2, range(5010, 5020)), 
-                                                (3, range(5020, 5030)), (4, range(5030, 5040))]:
-                        if dst_port in port_range or src_port in port_range:
-                            self.cam_last_bytes[cam_id] += payload_len
-                            self.cam_packet_counts[cam_id] += 1
-
-                except Exception:
-                    pass
-
-            sniff(prn=packet_callback, store=False, iface=None, filter="udp", timeout=60)
-        except Exception:
-            pass
-
-    def get_bitrate(self, cam_id: int) -> float:
-        """Retorna bitrate estimado em Mbps (baseado em pacotes capturados)"""
-        if cam_id not in self.cam_last_time:
-            return 0.0
-
-        now = time.time()
-        bytes_count = self.cam_last_bytes.get(cam_id, 0)
-        last_time = self.cam_last_time.get(cam_id, 0)
-
-        if last_time == 0:
-            self.cam_last_time[cam_id] = now
-            return 0.0
-
-        time_delta = now - last_time
-        if time_delta < 1.0:  # Atualizar a cada 1s
-            return self.cam_bitrates.get(cam_id, 0.0)
-
-        # Calcular Mbps
-        bits_per_sec = (bytes_count * 8) / time_delta
-        mbps = bits_per_sec / 1_000_000
-
-        self.cam_bitrates[cam_id] = mbps
-        self.cam_last_bytes[cam_id] = 0
-        self.cam_last_time[cam_id] = now
-
-        return mbps
 
 
 # ----------------------------- Log -----------------------------
@@ -804,8 +701,6 @@ class RTSPObjectDetector:
         self.log = log
         self.telegram = telegram
 
-        self.network_monitor = None
-
         self.models_dir = Path(models_dir)
         self.foto_dir = Path(foto_dir)
         self.models_dir.mkdir(exist_ok=True)
@@ -822,20 +717,6 @@ class RTSPObjectDetector:
         self.photo_callback = None
 
         self.inf_times: List[float] = []
-        self.last_performance: Dict[str, Any] = {}
-
-        # Métricas de rede/stream
-        self._frame_timestamps: List[float] = []  # Para calcular jitter
-        self._frame_sizes: List[int] = []  # Para calcular bitrate
-        self._total_frames_received = 0
-        self._total_frames_expected = 0
-        self._last_bitrate_calc_time = 0.0
-        self._bytes_received = 0
-        self._latency_samples: List[float] = []
-        self._ping_ms = 0.0
-        self._last_ping_time = 0.0
-        self._last_est_frame_size = 0
-        self._bitrate_sample_every = 3
 
         # Config runtime
         self.cooldown_s = 2.0
@@ -1152,19 +1033,8 @@ class RTSPObjectDetector:
                 self.log.log("ERROR", f"Erro no callback de foto: {e}", self.cam_id)
 
         if self.telegram_mode in ("all", "detections") and self.telegram.enabled:
-            # Construir mensagem amigável com dados importantes
-            perf = self.last_performance or {}
-            real_bitrate = self.network_monitor.get_bitrate(self.cam_id) if self.network_monitor else 0.0
-            
             timestamp_formatted = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
             conf_pct = (conf_avg * 100) if conf_avg > 0 else 0
-            
-            # Formatar FPS e latência com 1 casa decimal
-            fps = perf.get('fps', 0)
-            fps_str = f"{fps:.1f}" if isinstance(fps, (int, float)) else "N/A"
-            
-            latency = perf.get('latency', 0)
-            latency_str = f"{latency:.1f}" if isinstance(latency, (int, float)) else "N/A"
             
             # Determinar texto da detecção
             if detected_classes:
@@ -1188,7 +1058,6 @@ class RTSPObjectDetector:
                 f"⏰ {timestamp_formatted}\n"
                 f"🔍 Detectado: {detection_text}\n"
                 f"{confidence_emoji} Confiança: {conf_pct:.1f}%\n"
-                f"📡 FPS: {fps_str} | Latência: {latency_str}ms\n"
                 f"v{APP_VERSION}"
             )
             
@@ -1253,8 +1122,6 @@ class RTSPObjectDetector:
 
             self._log_detector_config()
 
-            frame_count = 0
-            start_mono = time.monotonic()
             self.last_frame_timestamp = time.time()
 
             while self.running:
@@ -1305,24 +1172,6 @@ class RTSPObjectDetector:
                 if self.status == "online":
                     self.status = "receiving"
 
-                # Coletar métricas de rede
-                self._total_frames_received += 1
-                self._frame_timestamps.append(now_wall)
-                if self._bitrate_sample_every > 0 and (self._total_frames_received % self._bitrate_sample_every) == 0:
-                    frame_size = self._estimate_frame_size_bytes(frame)
-                    self._last_est_frame_size = frame_size
-                else:
-                    frame_size = self._last_est_frame_size or self._estimate_frame_size_bytes(frame)
-                self._frame_sizes.append(frame_size)
-                self._bytes_received += frame_size
-
-                # Manter apenas últimos 100 frames para cálculos
-                if len(self._frame_timestamps) > 100:
-                    self._frame_timestamps.pop(0)
-                    self._frame_sizes.pop(0)
-
-                frame_count += 1
-
                 # OTIMIZAÇÃO: Skip de processamento YOLO (reduz carga em 66% com skip=2)
                 # Frame RAW é sempre enviado para UI, mas YOLO só processa 1 a cada (skip+1) frames
                 self._frame_skip_counter += 1
@@ -1340,13 +1189,9 @@ class RTSPObjectDetector:
                 if frame.std() < 5.0:
                     continue
 
-                # Medir latência de processamento
-                process_start = time.time()
                 boxes, confs, cids, inf_time = self._detect(frame)
                 self.inf_times.append(inf_time)
                 frame_draw = self._draw_boxes(frame, boxes, confs, cids)
-                process_end = time.time()
-                self._latency_samples.append(process_end - process_start)
 
                 # Disparo de evento (monotonic)
                 if boxes and self._person_present(cids):
@@ -1403,39 +1248,7 @@ class RTSPObjectDetector:
                     except Exception as e:
                         self.log.log("ERROR", f"Erro no callback de frame: {e}", self.cam_id)
 
-                # Performance (monotonic)
-                if frame_count % 200 == 0:
-                    elapsed = time.monotonic() - start_mono
-                    fps = frame_count / elapsed if elapsed > 0 else 0
-                    if PSUTIL_AVAILABLE:
-                        cpu_percent = psutil.cpu_percent(interval=None)
-                        ram_percent = psutil.virtual_memory().percent
-                    else:
-                        cpu_percent = 0.0
-                        ram_percent = 0.0
-                    avg_inf = sum(self.inf_times) / len(self.inf_times) if self.inf_times else 0
-                    gpu_info = "CUDA" if cv2.cuda.getCudaEnabledDeviceCount() > 0 else "CPU"
-                    
-                    # Calcular métricas de rede
-                    bitrate_mbs = self._calculate_bitrate()
-                    bitrate_mbps = bitrate_mbs * 8.0
-                    latency_ms = self._calculate_latency()
-                    jitter_ms = self._calculate_jitter()
-                    frame_loss = self._calculate_frame_loss()
-                    transport = os.environ.get("OPENCV_FFMPEG_CAPTURE_OPTIONS", "")
-                    protocol = "UDP" if "udp" in transport.lower() else "TCP" if "tcp" in transport.lower() else "?"
-                    
-                    # Ping (atualizar a cada 10 segundos)
-                    if now_wall - self._last_ping_time > 10.0:
-                        self._ping_ms = self._measure_ping()
-                        self._last_ping_time = now_wall
-                    
-                    self.last_performance = {
-                        "fps": fps, "cpu": cpu_percent, "ram": ram_percent,
-                        "inf_time": avg_inf, "gpu": gpu_info, "detections": self.detections_total,
-                        "bitrate": bitrate_mbps, "latency": latency_ms, "jitter": jitter_ms,
-                        "ping": self._ping_ms, "protocol": protocol, "frame_loss": frame_loss
-                    }
+                if len(self.inf_times) > 400:
                     self.inf_times.clear()
 
         finally:
@@ -1444,107 +1257,6 @@ class RTSPObjectDetector:
                     self.cap.release()
             except Exception:
                 pass
-
-    def _calculate_bitrate(self) -> float:
-        """Calcula taxa de transferência em MB/s baseado nos últimos frames"""
-        try:
-            if len(self._frame_sizes) < 2:
-                return 0.0
-            total_bytes = sum(self._frame_sizes)
-            time_span = self._frame_timestamps[-1] - self._frame_timestamps[0]
-            if time_span <= 0:
-                return 0.0
-            bytes_per_sec = total_bytes / time_span
-            return bytes_per_sec / 1_000_000  # Converter para MB/s
-        except Exception:
-            return 0.0
-
-    def _estimate_frame_size_bytes(self, frame) -> int:
-        """Estima tamanho do frame comprimido (JPEG) para aproximar taxa real"""
-        try:
-            encode_params = [int(cv2.IMWRITE_JPEG_QUALITY), 70]
-            ok, buf = cv2.imencode(".jpg", frame, encode_params)
-            if ok:
-                return int(len(buf))
-        except Exception:
-            pass
-        try:
-            if hasattr(frame, "nbytes"):
-                return int(frame.nbytes)
-        except Exception:
-            pass
-        return 0
-
-    def _calculate_latency(self) -> float:
-        """Calcula latência estimada em ms (tempo entre captura e processamento)"""
-        try:
-            if len(self._latency_samples) > 0:
-                avg_latency = sum(self._latency_samples) / len(self._latency_samples)
-                self._latency_samples.clear()
-                return avg_latency * 1000  # Converter para ms
-            return 0.0
-        except Exception:
-            return 0.0
-
-    def _calculate_jitter(self) -> float:
-        """Calcula jitter em ms (variação no intervalo entre frames)"""
-        try:
-            if len(self._frame_timestamps) < 3:
-                return 0.0
-            intervals = []
-            for i in range(1, len(self._frame_timestamps)):
-                intervals.append(self._frame_timestamps[i] - self._frame_timestamps[i-1])
-            if len(intervals) < 2:
-                return 0.0
-            avg_interval = sum(intervals) / len(intervals)
-            variance = sum((x - avg_interval) ** 2 for x in intervals) / len(intervals)
-            jitter = (variance ** 0.5) * 1000  # Converter para ms
-            return jitter
-        except Exception:
-            return 0.0
-
-    def _calculate_frame_loss(self) -> float:
-        """Calcula perda de frames estimada em %"""
-        try:
-            if self._total_frames_received < 10:
-                return 0.0
-            # Estimar frames esperados baseado no FPS ideal (assumindo 25 FPS)
-            if len(self._frame_timestamps) >= 2:
-                time_span = self._frame_timestamps[-1] - self._frame_timestamps[0]
-                expected = time_span * 25  # 25 FPS esperado
-                received = len(self._frame_timestamps)
-                if expected > 0:
-                    loss = ((expected - received) / expected) * 100
-                    return max(0.0, min(100.0, loss))  # Limitar entre 0-100%
-            return 0.0
-        except Exception:
-            return 0.0
-
-    def _measure_ping(self) -> float:
-        """Mede ping para o host da câmera em ms"""
-        try:
-            import re
-            import subprocess
-            # Extrair hostname/IP da URL RTSP
-            match = re.search(r'rtsp://(?:[^:@]+:[^:@]+@)?([^:/]+)', self.rtsp_url)
-            if not match:
-                return 0.0
-            host = match.group(1)
-            # Executar ping (1 pacote, timeout 2s)
-            result = subprocess.run(
-                ["ping", "-n", "1", "-w", "2000", host],
-                capture_output=True,
-                text=True,
-                timeout=3
-            )
-            # Procurar tempo de resposta no output
-            time_match = re.search(r'tempo[=<](\d+)ms', result.stdout, re.IGNORECASE)
-            if time_match:
-                return float(time_match.group(1))
-            return 0.0
-        except Exception:
-            return 0.0
-
 
 # ----------------------------- UI -----------------------------
 class InterfaceGrafica:
@@ -1575,8 +1287,6 @@ class InterfaceGrafica:
         self.log.log("INFO", f"Working Directory: {Path.cwd()}")
         self.log.log("INFO", separator)
 
-        # Status do Scapy/Npcap é exibido apenas na guia Performance (sem log)
-
         try:
             cv2.setLogCallback(lambda level, msg: self.log.log("INFO", f"OpenCV [{level}]: {msg.strip()}"))
         except Exception:
@@ -1606,9 +1316,6 @@ class InterfaceGrafica:
         self.threads: Dict[int, threading.Thread] = {}
         self.running = False
 
-        # Network Monitor (captura RTP para taxa real)
-        self.network_monitor = NetworkMonitor()
-
         # Watchdog (monotonic)
         self.watchdog_interval_ms = 2000
         self.watchdog_no_frame_s = 20.0  # Aumentado de 12s para 20s (rede instável)
@@ -1637,16 +1344,11 @@ class InterfaceGrafica:
         self.notebook.add(self.frame_logs, text="Logs")
         self._build_logs_tab()
 
-        self.frame_performance = ttk.Frame(self.notebook)
-        self.notebook.add(self.frame_performance, text="Performance")
-        self._build_performance_tab()
-
         self.frame_about = ttk.Frame(self.notebook)
         self.notebook.add(self.frame_about, text="Sobre")
         self._build_about_tab()
 
         self._load_logs_tail()
-        self.root.after(1000, self._update_performance)
 
         self._process_queues()
         self.log.log("INFO", "UI initialized successfully")
@@ -2124,8 +1826,6 @@ class InterfaceGrafica:
                 self._show_tooltip_on_hover(widget, tip_text)
             else:
                 self._hide_tooltip(widget)
-        if not show_tips:
-            self._hide_perf_header_tooltip()
 
     def _show_tooltip_on_hover(self, widget, text):
         """Mostra tooltip ao passar mouse sobre widget"""
@@ -2207,167 +1907,6 @@ class InterfaceGrafica:
         self.text_logs.tag_config("ERROR", foreground="#FF0000")  # Vermelho
         self.text_logs.tag_config("WARN", foreground="#FF8C00")   # Laranja escuro
 
-    def _build_performance_tab(self):
-        columns = ("Câmera", "FPS", "Tx (Mbps/MB/s)", "Latência (ms)", "Jitter (ms)", "Ping (ms)", "Perda (%)", "Proto", "CPU (%)", "RAM (%)")
-        self.perf_tree = ttk.Treeview(self.frame_performance, columns=columns, show="headings", height=6)
-
-        col_widths = {"Câmera": 80, "FPS": 60, "Tx (Mbps/MB/s)": 120, "Latência (ms)": 90, "Jitter (ms)": 80,
-                      "Ping (ms)": 70, "Perda (%)": 70, "Proto": 60, "CPU (%)": 60, "RAM (%)": 60}
-        
-        for col in columns:
-            self.perf_tree.heading(col, text=col)
-            self.perf_tree.column(col, width=col_widths.get(col, 80), anchor="center")
-
-        scrollbar = ttk.Scrollbar(self.frame_performance, orient="vertical", command=self.perf_tree.yview)
-        self.perf_tree.configure(yscrollcommand=scrollbar.set)
-
-        self.perf_tree.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
-
-        for cam in range(1, 5):
-            self.perf_tree.insert("", "end", iid=f"cam{cam}", values=(f"Câmera {cam}", "--", "--", "--", "--", "--", "--", "--", "--", "--"))
-        self.perf_tree.insert("", "end", iid="system", values=("Sistema", "--", "--", "--", "--", "--", "--", "--", "--", "--"))
-
-        self._setup_performance_header_tooltips()
-
-    def _setup_performance_header_tooltips(self):
-        self.perf_header_tips = {
-            "Câmera": "Identificação da câmera.",
-            "FPS": "Frames por segundo (taxa de quadros recebidos).",
-            "Tx (Mbps/MB/s)": "Taxa de transferência estimada do stream em Mbps e MB/s (estimativa por compressão JPEG dos frames).",
-            "Latência (ms)": "Tempo de processamento do frame (captura → detecção).",
-            "Jitter (ms)": "Variação do intervalo entre frames (estabilidade do stream).",
-            "Ping (ms)": "Tempo de resposta de rede até o host da câmera.",
-            "Perda (%)": "Percentual estimado de perda de frames.",
-            "Proto": "Protocolo RTSP em uso (UDP/TCP).",
-            "CPU (%)": "Uso de CPU do processo.",
-            "RAM (%)": "Uso de memória do processo."
-        }
-        self._perf_header_tooltip = None
-        self._perf_header_current = None
-        self.perf_tree.bind("<Motion>", self._on_perf_header_motion)
-        self.perf_tree.bind("<Leave>", self._on_perf_header_leave)
-
-    def _on_perf_header_motion(self, event):
-        if not getattr(self, "var_show_tips", None) or not self.var_show_tips.get():
-            self._hide_perf_header_tooltip()
-            return
-
-        region = self.perf_tree.identify_region(event.x, event.y)
-        if region != "heading":
-            self._hide_perf_header_tooltip()
-            return
-
-        col_id = self.perf_tree.identify_column(event.x)  # ex: #1
-        try:
-            col_index = int(col_id.replace("#", "")) - 1
-        except Exception:
-            self._hide_perf_header_tooltip()
-            return
-
-        columns = list(self.perf_tree["columns"])
-        if col_index < 0 or col_index >= len(columns):
-            self._hide_perf_header_tooltip()
-            return
-
-        col_name = columns[col_index]
-        tip = self.perf_header_tips.get(col_name)
-        if not tip:
-            self._hide_perf_header_tooltip()
-            return
-
-        if self._perf_header_current != col_name:
-            self._perf_header_current = col_name
-            self._show_perf_header_tooltip(event.x_root + 10, event.y_root + 10, tip)
-
-    def _on_perf_header_leave(self, event):
-        self._hide_perf_header_tooltip()
-
-    def _show_perf_header_tooltip(self, x, y, text):
-        self._hide_perf_header_tooltip()
-        tooltip = tk.Toplevel()
-        tooltip.wm_overrideredirect(True)
-        tooltip.wm_geometry(f"+{x}+{y}")
-        label = tk.Label(
-            tooltip,
-            text=text,
-            background="#ffffe0",
-            relief="solid",
-            borderwidth=1,
-            wraplength=300,
-            justify="left",
-            font=("Arial", 9)
-        )
-        label.pack()
-        self._perf_header_tooltip = tooltip
-
-    def _hide_perf_header_tooltip(self):
-        if self._perf_header_tooltip is not None:
-            try:
-                self._perf_header_tooltip.destroy()
-            except Exception:
-                pass
-        self._perf_header_tooltip = None
-        self._perf_header_current = None
-
-    def _update_performance(self):
-        try:
-            global_cpu = 0.0
-            global_ram = 0.0
-            count = 0
-            for cam in range(1, 5):
-                if cam in self.detectors and hasattr(self.detectors[cam], "last_performance"):
-                    perf = self.detectors[cam].last_performance
-                    fps = perf.get("fps", 0)
-                    cpu = perf.get("cpu", 0)
-                    ram = perf.get("ram", 0)
-                    latency = perf.get("latency", 0)
-                    jitter = perf.get("jitter", 0)
-                    ping = perf.get("ping", 0)
-                    frame_loss = perf.get("frame_loss", 0)
-                    protocol = perf.get("protocol", "?")
-                    
-                    # Tentar usar bitrate do Network Monitor, caso contrário usar o calculado internamente
-                    bitrate_real = self.network_monitor.get_bitrate(cam) if hasattr(self.network_monitor, "get_bitrate") else 0
-                    if bitrate_real == 0:
-                        # Fallback: usar bitrate calculado internamente
-                        bitrate_mbs = perf.get("bitrate", 0) / 8.0 if perf.get("bitrate", 0) > 0 else 0.0
-                    else:
-                        bitrate_mbs = bitrate_real / 1_000_000
-                    bitrate_mbps = bitrate_mbs * 8.0
-
-                    fps_text = f"{fps:.1f}" + (" ⚠" if fps < 10 else "")
-                    bitrate_text = f"{bitrate_mbps:.2f}Mbps ({bitrate_mbs:.2f}MB/s)" if bitrate_mbps > 0 else "--"
-                    latency_text = f"{latency:.0f}ms" + (" ⚠" if latency > 100 else "") if latency > 0 else "--"
-                    jitter_text = f"{jitter:.0f}ms" + (" ⚠" if jitter > 30 else "") if jitter > 0 else "--"
-                    ping_text = f"{ping:.0f}ms" + (" ⚠" if ping > 100 else "") if ping > 0 else "--"
-                    loss_text = f"{frame_loss:.1f}%" + (" ⚠" if frame_loss > 5 else "") if frame_loss > 0 else "--"
-                    cpu_text = f"{cpu:.0f}%" + (" ⚠" if cpu > 80 else "")
-                    ram_text = f"{ram:.0f}%" + (" ⚠" if ram > 80 else "")
-
-                    self.perf_tree.item(f"cam{cam}", values=(
-                        f"Câmera {cam}", fps_text, bitrate_text, latency_text, jitter_text, 
-                        ping_text, loss_text, protocol, cpu_text, ram_text
-                    ))
-
-                    global_cpu += cpu
-                    global_ram += ram
-                    count += 1
-                else:
-                    self.perf_tree.item(f"cam{cam}", values=(f"Câmera {cam}", "--", "--", "--", "--", "--", "--", "--", "--", "--"))
-
-            if count > 0:
-                global_cpu /= count
-                global_ram /= count
-
-            self.perf_tree.item("system", values=(
-                "Sistema", "--", "--", "--", "--", "--", "--", "--", f"{global_cpu:.0f}%", f"{global_ram:.0f}%"
-            ))
-        except Exception:
-            pass
-
-        self.root.after(1000, self._update_performance)
-
     def _build_about_tab(self):
         ttk.Label(self.frame_about, text=f"Versão: {APP_VERSION}", font=("Arial", 12, "bold")).pack(pady=10)
         ttk.Label(self.frame_about, text=f"Commit: {get_commit_code()}", font=("Arial", 10)).pack(pady=2)
@@ -2389,7 +1928,7 @@ class InterfaceGrafica:
 
         ttk.Label(
             self.frame_about,
-            text="Recursos: detecção em tempo real, grupos por evento, métricas de performance, "
+            text="Recursos: detecção em tempo real, grupos por evento,  "
                  "controle de falsos positivos e captura persistente de fotos.",
             font=("Arial", 10),
             wraplength=520,
@@ -2882,11 +2421,6 @@ class InterfaceGrafica:
             4: self.config["CAM4"].get("rtsp_url", "").strip(),
         }
 
-        # Iniciar Network Monitor para captura de taxa real
-        enabled_urls = {cam_id: url for cam_id, url in urls.items() if url}
-        self.network_monitor.start(enabled_urls)
-        self.log.log("INFO", "Network Monitor iniciado para medição de taxa real")
-
         enabled_cams = self._enabled_cams()
 
         for cam_id in (1, 2, 3, 4):
@@ -2898,7 +2432,6 @@ class InterfaceGrafica:
                 continue
 
             det = RTSPObjectDetector(cam_id, urls[cam_id], self.log, self.telegram)
-            det.network_monitor = self.network_monitor
             self._apply_detector_config(det)
 
             det.frame_callback = lambda cid, fr, q=self.frame_queue: q.put((cid, fr))
@@ -2923,13 +2456,6 @@ class InterfaceGrafica:
                 total_detections += int(getattr(det, "detections_total", 0))
             except Exception:
                 pass
-
-        # Parar Network Monitor
-        try:
-            self.network_monitor.stop()
-            self.log.log("INFO", "Network Monitor parado")
-        except Exception:
-            pass
 
         for det in list(self.detectors.values()):
             try:
@@ -3002,7 +2528,6 @@ class InterfaceGrafica:
 
         try:
             new_det = RTSPObjectDetector(cam_id, url, self.log, self.telegram)
-            new_det.network_monitor = self.network_monitor
             self._apply_detector_config(new_det)
 
             new_det.frame_callback = lambda cid, fr, q=self.frame_queue: q.put((cid, fr))
