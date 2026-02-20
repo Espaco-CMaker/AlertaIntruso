@@ -1,4 +1,10 @@
-﻿# CHANGELOG - AlertaIntruso
+# CHANGELOG - AlertaIntruso
+
+## v4.5.9 (20/02/2026)
+### ✅ Anti-spam de alertas
+- **NOVO**: Máquina de estados de presença por câmera (ENTRADA, MEIO, SAÍDA)
+- **NOVO**: Alerta intermediário para presença prolongada/parada
+- **NOVO**: Alerta de saída após timeout sem pessoa detectada
 
 $16191339
 
@@ -145,5 +151,6 @@ $16191339
 - Taxa de transferência em Mbps/MB/s
 - Logs coloridos (ERROR em vermelho, WARN em laranja)
 - Métricas avançadas de rede na aba Performance
+
 
 

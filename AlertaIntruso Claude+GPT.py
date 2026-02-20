@@ -4,7 +4,7 @@ ALERTAINTRUSO — ALARME INTELIGENTE POR VISÃO COMPUTACIONAL (RTSP • YOLO •
 ================================================================================
 Arquivo:        AlertaIntruso Claude+GPT.py
 Projeto:        Sistema de Alarme Inteligente por Visão Computacional
-Versão:         4.5.8
+Versão:         4.5.9
 Data:           20/02/2026
 Autor:          Fabio Bettio
 Licença:        Uso educacional / experimental
@@ -22,6 +22,11 @@ de movimento.
 ================================================================================
 Changelog completo
 ================================================================================
+v4.5.9 (20/02/2026) [ANTI-SPAM ALERTAS] (linhas: 0)
+    - NOVO: Eventos de presença com ENTRADA/MEIO/SAÍDA
+    - NOVO: Alerta MEIO para presença prolongada/parada
+    - NOVO: Alerta SAÍDA após timeout sem pessoa
+
 v4.5.8 (20/02/2026) [ACEITE] (linhas: 0)
     - MODIFICADO: Remocao da guia Performance e respectivas funcoes
     - ALTERADO: Adicionado script accept_release.py para automacao de aceite
@@ -243,7 +248,7 @@ def set_ffmpeg_capture_options(transport: str = "udp") -> None:
 
 set_ffmpeg_capture_options("udp")
 
-APP_VERSION = "4.5.8"
+APP_VERSION = "4.5.9"
 MAX_THUMBS = 200
 
 
@@ -747,6 +752,17 @@ class RTSPObjectDetector:
         self._pending_shots = 0
         self._event_uid = ""
         self._event_conf_avg = 0.0  # Confiança média do evento (fixada na detecção inicial)
+        self.presence_exit_timeout_s = 3.0
+        self.presence_mid_alert_after_s = 20.0
+        self.presence_min_move_px = 25.0
+        self._presence_active = False
+        self._presence_mid_sent = False
+        self._presence_start_mono = 0.0
+        self._presence_last_seen_mono = 0.0
+        self._presence_enter_center = None
+        self._presence_last_frame_draw = None
+        self._presence_last_frame_clean = None
+        self._presence_last_boxes = []
 
         # Capturas por evento (monotonic)
         self._last_shot_time = 0.0
@@ -942,6 +958,23 @@ class RTSPObjectDetector:
     def _person_present(self, cids) -> bool:
         return 0 in cids  # COCO: person=0
 
+    def _largest_person_box(self, boxes, cids):
+        person_boxes = [b for i, b in enumerate(boxes) if i < len(cids) and cids[i] == 0]
+        if not person_boxes:
+            return None
+        return max(person_boxes, key=lambda b: b[2] * b[3])
+
+    def _box_center(self, box):
+        x, y, w, h = box
+        return (x + (w / 2.0), y + (h / 2.0))
+
+    def _distance_px(self, p1, p2) -> float:
+        if (p1 is None) or (p2 is None):
+            return 0.0
+        dx = float(p1[0]) - float(p2[0])
+        dy = float(p1[1]) - float(p2[1])
+        return float((dx * dx + dy * dy) ** 0.5)
+
     def _extract_object_crop(self, frame_bgr, boxes, margin_percent=15):
         """Extrai crop do maior objeto detectado com margem de 15%."""
         if not boxes:
@@ -997,7 +1030,7 @@ class RTSPObjectDetector:
                 f"Tipo: {type(e).__name__} | "
                 f"Erro: {str(e)}", self.cam_id)
 
-    def _save_and_notify(self, frame_bgr_with_boxes, frame_bgr_clean, boxes, event_uid: str, shot_idx: int, person_count: int, conf_avg: float, detected_classes=None):
+    def _save_and_notify(self, frame_bgr_with_boxes, frame_bgr_clean, boxes, event_uid: str, shot_idx: int, person_count: int, conf_avg: float, detected_classes=None, alert_stage: str = "DETECÇÃO"):
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         safe_uid = (event_uid or "evt").replace(":", "-").replace("/", "-")
         filename = f"{ts}_CAM{self.cam_id}_EVT{safe_uid}_S{shot_idx}.jpg"
@@ -1052,7 +1085,7 @@ class RTSPObjectDetector:
             
             # Construir caption formatado (com cores via emojis)
             caption = (
-                f"🟢 ALERTA DE DETECÇÃO\n"
+                f"🟢 ALERTA {alert_stage}\n"
                 f"{'━' * 8}\n"
                 f"📹 Câmera {self.cam_id}\n"
                 f"⏰ {timestamp_formatted}\n"
@@ -1102,6 +1135,13 @@ class RTSPObjectDetector:
             self._pending_shots = 0
             self._last_shot_time = 0.0
             self._last_event_time = 0.0
+            self._presence_active = False
+            self._presence_mid_sent = False
+            self._presence_last_seen_mono = 0.0
+            self._presence_enter_center = None
+            self._presence_last_frame_draw = None
+            self._presence_last_frame_clean = None
+            self._presence_last_boxes = []
             self.last_frame_mono = 0.0
             self.last_frame_wall_ts = 0.0
             self.log.log("INFO", "Soft reconnect completed successfully", self.cam_id)
@@ -1193,54 +1233,77 @@ class RTSPObjectDetector:
                 self.inf_times.append(inf_time)
                 frame_draw = self._draw_boxes(frame, boxes, confs, cids)
 
-                # Disparo de evento (monotonic)
-                if boxes and self._person_present(cids):
-                    if (now_mono - self._last_event_time) >= self.cooldown_s and self._pending_shots <= 0:
-                        evt_ts = int(time.time())  # carimbo humano apenas
+                person_present = bool(boxes and self._person_present(cids))
+                if person_present:
+                    self._presence_last_seen_mono = now_mono
+                    self._presence_last_frame_draw = frame_draw.copy()
+                    self._presence_last_frame_clean = frame.copy()
+                    self._presence_last_boxes = [list(b) for b in boxes]
+
+                    largest_person = self._largest_person_box(boxes, cids)
+                    person_center = self._box_center(largest_person) if largest_person is not None else None
+
+                    if not self._presence_active and (now_mono - self._last_event_time) >= self.cooldown_s:
+                        evt_ts = int(time.time())
                         self._event_uid = f"{self.cam_id}-{evt_ts}-{self.detections_total + 1}"
-                        self._pending_shots = int(max(1, self.photos_per_event))
+                        self._event_conf_avg = (sum(confs) / len(confs)) if confs else 0.0
+                        self._presence_active = True
+                        self._presence_mid_sent = False
+                        self._presence_start_mono = now_mono
+                        self._presence_enter_center = person_center
                         self._last_event_time = now_mono
-                        self._last_shot_time = 0.0
                         self.detections_total += 1
 
                         person_count = sum(1 for cid in cids if cid == 0)
-                        conf_avg = (sum(confs) / len(confs)) if confs else 0.0
-                        self._event_conf_avg = conf_avg  # Armazena confiança do evento
-                        best_conf = max(confs) if confs else 0.0
-                        total_boxes = len(boxes)
-
-                        self.log.log(
-                            "WARN",
-                            "EVENTO MOVIMENTO/DETECCAO | "
-                            f"evt={self._event_uid} | pessoas={person_count} | boxes={total_boxes} | "
-                            f"conf_avg={conf_avg:.2f} | conf_max={best_conf:.2f} | "
-                            f"cooldown={self.cooldown_s:.2f}s | conf_th={self.conf_th:.2f} | nms_th={self.nms_th:.2f} | "
-                            f"photos={self._pending_shots} | min_shot_interval={self._min_shot_interval:.2f}s | "
-                            f"min_capture_interval_s={self.min_capture_interval_s:.2f}s | v{APP_VERSION}",
-                            self.cam_id
+                        detected_class_names = []
+                        for cid in set(cids):
+                            if self.classes and cid < len(self.classes):
+                                detected_class_names.append(self.classes[cid])
+                        self._save_and_notify(
+                            frame_draw, frame, boxes, self._event_uid, 1, person_count, self._event_conf_avg,
+                            detected_class_names, alert_stage="ENTRADA"
                         )
+                        self.log.log("INFO", f"EVENTO ENTRADA | evt={self._event_uid} | v{APP_VERSION}", self.cam_id)
 
-                # Fotos pendentes (monotonic + limite global)
-                # FIX CRÍTICO v4.3.20: só salvar foto se houver detecções no frame atual
-                if self._pending_shots > 0 and boxes and self._person_present(cids):
-                    if (now_mono - self._last_shot_time) >= self._min_shot_interval:
-                        if (now_mono - self._last_capture_time_global) >= self.min_capture_interval_s:
+                    if self._presence_active and (not self._presence_mid_sent):
+                        elapsed = now_mono - self._presence_start_mono
+                        move_px = self._distance_px(person_center, self._presence_enter_center)
+                        if elapsed >= self.presence_mid_alert_after_s and move_px <= self.presence_min_move_px:
                             person_count = sum(1 for cid in cids if cid == 0)
-                            # Usa confiança armazenada do evento (não recalcula)
-                            conf_avg = self._event_conf_avg
-                            shot_idx = (int(self.photos_per_event) - int(self._pending_shots) + 1)
-                            
-                            # Coletar nomes das classes detectadas
                             detected_class_names = []
                             for cid in set(cids):
                                 if self.classes and cid < len(self.classes):
                                     detected_class_names.append(self.classes[cid])
-
-                            self._save_and_notify(frame_draw, frame, boxes, self._event_uid, shot_idx, person_count, conf_avg, detected_class_names)
-
-                            self._pending_shots -= 1
-                            self._last_shot_time = now_mono
-                            self._last_capture_time_global = now_mono
+                            self._save_and_notify(
+                                frame_draw, frame, boxes, self._event_uid, 2, person_count, self._event_conf_avg,
+                                detected_class_names, alert_stage="MEIO"
+                            )
+                            self._presence_mid_sent = True
+                            self.log.log("INFO", f"EVENTO MEIO | evt={self._event_uid} | v{APP_VERSION}", self.cam_id)
+                elif self._presence_active:
+                    since_seen = now_mono - self._presence_last_seen_mono
+                    if since_seen >= self.presence_exit_timeout_s:
+                        if self._presence_last_frame_draw is not None and self._presence_last_frame_clean is not None:
+                            self._save_and_notify(
+                                self._presence_last_frame_draw,
+                                self._presence_last_frame_clean,
+                                self._presence_last_boxes,
+                                self._event_uid,
+                                3,
+                                0,
+                                self._event_conf_avg,
+                                ["saida"],
+                                alert_stage="SAÍDA",
+                            )
+                        self.log.log("INFO", f"EVENTO SAÍDA | evt={self._event_uid} | v{APP_VERSION}", self.cam_id)
+                        self._presence_active = False
+                        self._presence_mid_sent = False
+                        self._presence_start_mono = 0.0
+                        self._presence_last_seen_mono = 0.0
+                        self._presence_enter_center = None
+                        self._presence_last_frame_draw = None
+                        self._presence_last_frame_clean = None
+                        self._presence_last_boxes = []
 
                 if self.frame_callback:
                     try:
@@ -1381,6 +1444,9 @@ class InterfaceGrafica:
                 "photos_per_event": "2",
                 "classes_enabled": "person",
                 "min_capture_interval_s": "1.0",
+                "presence_exit_timeout_s": "3.0",
+                "presence_mid_alert_after_s": "20.0",
+                "presence_min_move_px": "25.0",
                 "skip_frames": "2",  # Pula 2 frames (processa 1 a cada 3) - melhora performance
                 "input_size": "320",  # Resolução YOLO (320=rápido, 416=preciso, 608=lento)
                 "rtsp_transport": "udp",  # UDP (padrão) ou TCP
@@ -2352,6 +2418,9 @@ class InterfaceGrafica:
         det.telegram_mode = self.config["TELEGRAM"].get("alert_mode", "detections")
         det.photos_per_event = int(self.config["DETECTOR"].get("photos_per_event", "2"))
         det.min_capture_interval_s = float(self.config["DETECTOR"].get("min_capture_interval_s", "1.0"))
+        det.presence_exit_timeout_s = float(self.config["DETECTOR"].get("presence_exit_timeout_s", "3.0"))
+        det.presence_mid_alert_after_s = float(self.config["DETECTOR"].get("presence_mid_alert_after_s", "20.0"))
+        det.presence_min_move_px = float(self.config["DETECTOR"].get("presence_min_move_px", "25.0"))
         det.skip_frames = int(self.config["DETECTOR"].get("skip_frames", "2"))
         det.input_size = int(self.config["DETECTOR"].get("input_size", "320"))
         det.max_photos_keep = int(self.config["DETECTOR"].get("max_photos_keep", "500"))
@@ -2692,4 +2761,5 @@ if __name__ == "__main__":
         traceback.print_exc()
         input("Pressione Enter para sair...")
         raise
+
 

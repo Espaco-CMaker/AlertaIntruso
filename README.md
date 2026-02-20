@@ -1,6 +1,6 @@
-﻿# AlertaIntruso - Sistema de Alarme Inteligente por Visão Computacional
+# AlertaIntruso - Sistema de Alarme Inteligente por Visão Computacional
 
-**Versão Atual Baseada na: 4.5.8** (20/02/2026)
+**Versão Atual Baseada na: 4.5.9** (20/02/2026)
 
 ## Descrição Geral
 
@@ -102,7 +102,7 @@ Edite `config.ini`:
 
 ## Desenvolvimento
 
-- **Versão**: 4.5.8
+- **Versão**: 4.5.9
 - **Data**: 20/02/2026
 - **Autor**: Fabio Bettio
 - **Licença**: Uso educacional/experimental
@@ -159,4 +159,5 @@ Para dúvidas ou issues, abra uma issue no GitHub ou entre em contato.
 ---
 
 *Sistema desenvolvido para aplicações de segurança residencial/comercial com foco em eficiência e confiabilidade.*
+
 
