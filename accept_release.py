@@ -19,7 +19,6 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import re
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -27,6 +26,9 @@ from typing import List, Optional, Tuple
 
 MAIN_FILE = Path("AlertaIntruso Claude+GPT.py")
 CHANGELOG_FILE = Path("CHANGELOG.md")
+README_FILE = Path("README.md")
+STATUS_FILE = Path("STATUS.md")
+RELEASES_URL = "https://github.com/Espaco-CMaker/AlertaIntruso/releases"
 
 
 def run(cmd: List[str], check: bool = True, capture: bool = True) -> subprocess.CompletedProcess:
@@ -214,11 +216,51 @@ def ensure_clean_worktree() -> None:
         )
 
 
-def stage_and_commit(msg: str) -> str:
-    run(["git", "add", "-A"], check=True, capture=True)
+def stage_and_commit(msg: str, paths: List[Path]) -> str:
+    add_cmd = ["git", "add"] + [str(p) for p in paths if p.exists()]
+    run(add_cmd, check=True, capture=True)
     run(["git", "commit", "-m", msg], check=True, capture=True)
     commit = run(["git", "rev-parse", "--short", "HEAD"], check=True, capture=True).stdout.strip()
     return commit
+
+
+def ensure_tag(tag_name: str) -> None:
+    tag_exists = run(
+        ["git", "rev-parse", "-q", "--verify", f"refs/tags/{tag_name}"],
+        check=False,
+        capture=True,
+    ).returncode == 0
+    if not tag_exists:
+        run(["git", "tag", "-a", tag_name, "-m", f"Release {tag_name}"], check=True, capture=True)
+
+
+def maybe_push_tag(do_push: bool, tag_name: str) -> None:
+    if do_push:
+        run(["git", "push", "origin", tag_name], check=True, capture=True)
+
+
+def try_upload_asset_to_release(tag_name: str, exe_path: Optional[Path], do_push: bool) -> None:
+    if not do_push or exe_path is None:
+        return
+    if not exe_path.exists():
+        return
+
+    gh_exists = run(["where", "gh"], check=False, capture=True).returncode == 0
+    if not gh_exists:
+        print("AVISO: gh CLI nao encontrado. Upload automatico de asset nao executado.")
+        print(f"Suba manualmente o executavel em: {RELEASES_URL}/tag/{tag_name}")
+        print(f"Arquivo: {exe_path}")
+        return
+
+    # Cria release se nao existir e faz upload do asset (sobrescrevendo se ja existir).
+    view = run(["gh", "release", "view", tag_name], check=False, capture=True)
+    if view.returncode != 0:
+        run(
+            ["gh", "release", "create", tag_name, "--title", f"AlertaIntruso {tag_name}", "--notes", f"Release automatizado {tag_name}"],
+            check=True,
+            capture=True,
+        )
+    run(["gh", "release", "upload", tag_name, str(exe_path), "--clobber"], check=True, capture=True)
 
 
 def update_changelog_commit_hash(new_version: str, release_date: str, commit_hash: str) -> None:
@@ -243,6 +285,7 @@ def main() -> int:
     parser.add_argument("--corrigido", default="", help="Resumo do que foi corrigido.")
     parser.add_argument("--no-build", action="store_true", help="Nao gera executavel.")
     parser.add_argument("--no-push", action="store_true", help="Nao faz push no github.")
+    parser.add_argument("--no-release-upload", action="store_true", help="Nao tenta upload do .exe no GitHub Release.")
     parser.add_argument("--allow-dirty", action="store_true", help="Permite rodar com worktree suja.")
     args = parser.parse_args()
 
@@ -285,14 +328,23 @@ def main() -> int:
             args.alterado,
             args.corrigido,
         )
-        release_hash = stage_and_commit(release_msg)
+        release_hash = stage_and_commit(
+            release_msg,
+            [MAIN_FILE, CHANGELOG_FILE, spec_path, README_FILE, STATUS_FILE],
+        )
         maybe_push(not args.no_push)
+        tag_name = f"v{new_version}"
+        ensure_tag(tag_name)
+        maybe_push_tag(not args.no_push, tag_name)
 
         update_changelog_commit_hash(new_version, release_date, release_hash)
         doc_hash = stage_and_commit(
-            f"docs(changelog): registra commit {release_hash} na v{new_version}"
+            f"docs(changelog): registra commit {release_hash} na v{new_version}",
+            [CHANGELOG_FILE],
         )
         maybe_push(not args.no_push)
+        if not args.no_release_upload:
+            try_upload_asset_to_release(tag_name, exe_path, not args.no_push)
 
         print("OK: aceite concluido")
         print(f"Versao anterior: v{current_version}")
@@ -300,6 +352,7 @@ def main() -> int:
         print(f"Spec: {spec_path}")
         if exe_path is not None:
             print(f"Executavel: {exe_path}")
+            print(f"Releases: {RELEASES_URL}")
         print(f"Commit release: {release_hash}")
         print(f"Commit changelog: {doc_hash}")
         return 0

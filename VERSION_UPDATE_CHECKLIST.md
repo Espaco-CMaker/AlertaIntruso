@@ -8,7 +8,8 @@ Este documento detalha o processo para atualizar a versão do AlertaIntruso de f
 - [ ] Incrementar **PATCH** (último dígito)
 - [ ] Atualizar docs: CHANGELOG.md, README.md, STATUS.md, RELEASE.md
 - [ ] Gerar executável versionado: `AlertaIntruso-vX.Y.Z.exe`
-- [ ] Atualizar Git (add/commit/push) com código + docs + executável
+- [ ] Atualizar Git (add/commit/push) com código + docs + `.spec` (sem versionar `.exe`)
+- [ ] Publicar executável nos assets da release no GitHub
 
 ### 1. Cabeçalho do Programa (AlertaIntruso Claude+GPT.py)
 - [ ] Atualizar versão em: `Versão:         X.Y.Z`
@@ -72,9 +73,12 @@ v4.5.0 (04/02/2026) [TIPO - DESCRIÇÃO] (linhas: XX)
 - [ ] Gerar novo executável: `.\.venv\Scripts\python.exe -m PyInstaller --onefile --windowed --name "AlertaIntruso-vX.Y.Z" "AlertaIntruso Claude+GPT.py"`
 - [ ] Aguardar ~15 minutos para conclusão
 - [ ] Verificar se `dist\AlertaIntruso-vX.Y.Z.exe` foi criado (tamanho ~70MB)
-- [ ] `git add dist\AlertaIntruso-vX.Y.Z.exe AlertaIntruso-vX.Y.Z.spec`
-- [ ] `git commit -m "build(vX.Y.Z): Adicionar executável versionado AlertaIntruso-vX.Y.Z.exe"`
+- [ ] **NÃO** adicionar `.exe` no Git (`dist\*.exe`)
+- [ ] `git add AlertaIntruso-vX.Y.Z.spec`
+- [ ] `git commit -m "build(vX.Y.Z): atualizar spec da versão"`
 - [ ] `git push origin main`
+- [ ] Criar/atualizar release `vX.Y.Z` no GitHub
+- [ ] Fazer upload do asset `dist\AlertaIntruso-vX.Y.Z.exe` na release
 
 ---
 

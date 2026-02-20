@@ -19,6 +19,8 @@ fotos/
 # Python
 __pycache__/
 *.pyc
+build/
+dist/*.exe
 
 # Sistema
 .DS_Store
