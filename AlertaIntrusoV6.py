@@ -4,7 +4,7 @@ ALERTAINTRUSO — ALARME INTELIGENTE POR VISÃO COMPUTACIONAL (RTSP • YOLO •
 ================================================================================
 Arquivo:        AlertaIntrusoV6.py
 Projeto:        Sistema de Alarme Inteligente por Visão Computacional
-Versão:         6.0.0
+Versão:         6.0.9
 Data:           10/03/2026
 Autor:          Fabio Bettio
 Licença:        Uso educacional / experimental
@@ -22,6 +22,15 @@ de movimento.
 ================================================================================
 Changelog completo
 ================================================================================
+v6.0.9 (10/03/2026) [ESTABILIDADE & NOVA ARQUITETURA UI]
+    - NOVO: UI totalmente responsiva (Canvas/Wrap) com estiramento elástico na ABA Configurações.
+    - NOVO: Trava Mutex global do Windows protegendo contra instâncias em duplicatas.
+    - NOVO: Desligamento Seguro Guiado (Graceful Shutdown -> cap.release() p/ TCP RTSP).
+    - NOVO: Reinicializadores (Reboot Buttons) que acionam CGI-Bin em background.
+    - NOVO: Checkboxes de 'Monitorar (Analítico)' persistentes (salvos em config.ini).
+    - OTIMIZAÇÃO: Delay de Backoff RTSP ampliado (2s -> 15s) evitando DDoS na própria rede caso as câmeras desliguem.
+    - OTIMIZAÇÃO: Traço do Retângulo de Alvos (Person BBox) travado fixo em 2px para evitar distorções de frame-size nas câmeras.
+
 v4.5.9 (20/02/2026) [ANTI-SPAM ALERTAS] (linhas: 0)
     - NOVO: Eventos de presença com ENTRADA/MEIO/SAÍDA
     - NOVO: Alerta MEIO para presença prolongada/parada
