@@ -1,41 +1,426 @@
 """
-AlertaIntruso Claude+GPT
-Sistema de alarme inteligente por visão computacional
+================================================================================
+ALERTAINTRUSO — ALARME INTELIGENTE POR VISÃO COMPUTACIONAL (RTSP • YOLO • MULTICAM)
+================================================================================
+Arquivo:        AlertaIntrusoV6.py
+Projeto:        Sistema de Alarme Inteligente por Visão Computacional
+Versão:         6.0.0
+Data:           10/03/2026
+Autor:          Fabio Bettio
+Licença:        Uso educacional / experimental
+Status:         ESTÁVEL
 
-Versão: 4.5.9
-Data:   20/02/2026
-Autor:  Fabio Bettio
+================================================================================
+Descrição geral
+================================================================================
+Aplicação desktop em Python (Tkinter) para monitoramento contínuo (24/7) de
+múltiplas câmeras IP via RTSP, com detecção de pessoas utilizando OpenCV DNN
+(YOLOv4-tiny). O sistema prioriza robustez operacional, tolerância a falhas
+de stream, controle de falsos positivos e rastreabilidade completa de eventos
+de movimento.
 
-CHANGELOG
----------
-v4.5.9  (20/02/2026) - Anti-spam de alertas: máquina de estados por câmera (ENTRADA/MEIO/SAÍDA)
-v4.5.6  (19/02/2026) - Aba Sobre exibe commit hash; Telegram inclui versão e commit
-v4.5.5  (04/02/2026) - Aceite & estabilização; fix photo_callback, fila, TelegramBot.enviar_grupo_fotos
-v4.3.19 (02/02/2026) - Fix crítico: confiança 0.0% em alertas Telegram
-v4.3.18 (02/02/2026) - Emoji color coding por nível de confiança/criticidade no Telegram
-v4.3.17 (02/02/2026) - Fix: dupla validação de confiança pós-NMS (cv2.dnn.NMSBoxes)
-v4.3.16 (02/02/2026) - Fallback bitrate interno se NetworkMonitor indisponível
-v4.3.15 (02/02/2026) - GUI: scroll funcional com botões fixos na aba Config
-v4.3.14 (02/02/2026) - GUI: fotos mais novas aparecem primeiro na aba Fotos
-v4.3.13 (02/02/2026) - GUI: botões de controle fixos na base da interface
-v4.3.12 (02/02/2026) - GUI: scroll na aba Config com suporte a mouse wheel
-v4.3.11 (02/02/2026) - RTSP: backoff inicial aumentado para 5s, máximo 30s
-v4.3.10 (02/02/2026) - RTSP: timeout 10s, flush de buffer pós-reconexão (10 frames)
-v4.3.9  (02/02/2026) - Nomes de classes no Telegram; removido log 'MOVIMENTO SEM PESSOA'
-v4.3.8  (01/02/2026) - Telegram: dados compactados (1 decimal para floats)
-v4.3.7  (01/02/2026) - LogManager: erros críticos de conexão encaminhados ao Telegram
-v4.3.6  (01/02/2026) - Config: botão 'Testar envio' do Telegram
-v4.3.5  (01/02/2026) - GUI: frames vazios ao desconectar (sem frozen frames)
-v4.3.4  (01/02/2026) - GUI: checkbox auto-scroll nos logs, persiste em config.ini
-v4.3.3  (31/01/2026) - Telegram: separadores compactados (12 chars)
-v4.3.2  (31/01/2026) - Telegram: mensagens de início/parada amigáveis com emojis
-v4.3.1  (31/01/2026) - Telegram: alertas com métricas (timestamp, confiança, FPS, latência)
-v4.3.0  (30/01/2026) - NetworkMonitor: captura RTP em tempo real via Scapy
+================================================================================
+Changelog completo
+================================================================================
+v4.5.9 (20/02/2026) [ANTI-SPAM ALERTAS] (linhas: 0)
+    - NOVO: Eventos de presença com ENTRADA/MEIO/SAÍDA
+    - NOVO: Alerta MEIO para presença prolongada/parada
+    - NOVO: Alerta SAÍDA após timeout sem pessoa
+
+v4.5.8 (20/02/2026) [ACEITE] (linhas: 0)
+    - MODIFICADO: Remocao da guia Performance e respectivas funcoes
+    - ALTERADO: Adicionado script accept_release.py para automacao de aceite
+    - CORRIGIDO: Removidas referencias e integracoes obsoletas de metricas
+
+v4.5.7 (20/02/2026) [ACEITE] (linhas: 0)
+    - MODIFICADO: Remocao da guia Performance e respectivas funcoes
+    - ALTERADO: Adicionado script accept_release.py para automacao de aceite
+    - CORRIGIDO: Removidas referencias e integracoes obsoletas de metricas
+
+v4.5.6 (19/02/2026) [HOTFIX] (linhas: 0)
+    - NOVO: Aba Sobre exibe código do commit atual
+    - MELHORIA: Mensagem de inicialização no Telegram inclui commit
+
+v4.5.5 (04/02/2026) [ACEITE - ESTABILIZAÇÃO] (linhas: 0)
+    - FIX: Callback de foto e fila corrigidos (crop_path) + método enviar_grupo_fotos()
+    - LOG: STDERR agora classificado como ERROR
+    - LOG: Filtros INFO/WARN/ERROR movidos para a aba Logs
+    - LOG: Botão Limpar Logs apaga histórico (log.txt) e fila
+    - TELEGRAM: Sem mensagens de watchdog e sem WARN no Telegram
+    - UI: Redução de separadores em mensagens Telegram
+
+v4.5.4 (04/02/2026) [PADRONIZAÇÃO - LOGS] (linhas: 55)
+    - NOVO: Sistema de logs compatibilizado com ESPECIFICAÇÃO_LOGS do Guia_de_Padroes
+    - FORMATO: Novo formato padronizado "%(asctime)s | %(levelname)-7s | %(name)-15s | %(message)s"
+    - NOMENCLATURA: Loggers agora usam hierarquia de módulos (ex: "camera.detector", "telegram.bot")
+    - MENSAGENS: Mensagens seguem padrões do guia (ação + contexto + detalhes)
+    - ROTAÇÃO: Sistema de rotação automática (5MB por arquivo, 10 backups)
+    - ESTRUTURA: Cabeçalho de inicialização padronizado com linhas separadoras
+    - COMPATIBILIDADE: 100% compatível com especificação do Guia_de_Padroes
+
+v4.5.3 (04/02/2026) [OTIMIZAÇÃO - TELEGRAM] (linhas: 85)
+    - NOVO: Sistema de buffer para eventos de sistema no Telegram
+    - NOVO: Mensagens de watchdog/reconnect/falhas agrupadas e enviadas em lote
+    - OTIMIZAÇÃO: Redução drástica de mensagens Telegram em caso de instabilidade
+    - IMPLEMENTAÇÃO: Buffer com envio a cada 30s ou quando atingir 10 eventos
+    - MELHORIA: Mensagens agrupadas com timestamp individual e contador
+    - PERFORMANCE: Evita flood de notificações em reconexões/falhas múltiplas
+    - TELEGRAM: Envio único consolidado ao invés de uma mensagem por evento
+    - CONFIGURÁVEL: system_events_buffer_time e system_events_buffer_max
+
+v4.5.2 (04/02/2026) [FEATURE - TELEGRAM E DIAGNÓSTICO] (linhas: 136)
+    - NOVO: Fotos enviadas em GRUPO (sendMediaGroup) - foto geral + crop na mesma msg
+    - NOVO: Método TelegramBot.enviar_grupo_fotos() para múltiplas fotos por mensagem
+    - MELHORIA: _save_and_notify() agora usa sendMediaGroup quando há crop disponível
+    - TELEGRAM: Caption aparece apenas na primeira foto do grupo
+    - DIAGNÓSTICO: Warning "No libpcap provider" suprimido do console
+    - DIAGNÓSTICO: Log detalhado sobre status Scapy/Npcap no início do sistema
+    - DIAGNÓSTICO: Detecção automática de problemas com libpcap mesmo com Scapy instalado
+    - DOCUMENTAÇÃO: Criado NPCAP_INSTALL.md com guia completo de instalação
+    - LOG: Sistema indica se bitrate será real (RTP) ou estimado (interno)
+    - MELHORIA: Tratamento robusto de erros em enviar_grupo_fotos (timeout, conexão, arquivo)
+
+v4.5.1 (04/02/2026) [BUILD] (linhas: 0)
+    - Incremento de versão para gerar novo executável
+
+v4.5.0 (04/02/2026) [FEATURE + FIX - LOGS E GESTÃO DE FOTOS] (linhas: 98)
+    - NOVO: Limpeza automática de fotos antigas (manter apenas últimas X fotos)
+    - NOVO: Configuração max_photos_keep na aba Config (padrão: 500)
+    - NOVO: Função _cleanup_old_photos() chamada antes de salvar nova foto
+    - MELHORIA: Logs de erro detalhados para Telegram (HTTP status, tipo erro, arquivo)
+    - MELHORIA: Erros de Telegram agora são ERROR (não WARN)
+    - DETALHAMENTO: Timeout, ConnectionError, FileNotFoundError com contexto completo
+    - TELEGRAM: Logs incluem URL, ChatID, tamanho arquivo, resposta API
+    - PERSISTÊNCIA: Tabela de fotos agora limitada ao máximo configurado
+    - CONFIG.INI: Novo parâmetro max_photos_keep na seção [DETECTOR]
+
+v4.4.0 (04/02/2026) [FEATURE - NOVA FUNCIONALIDADE] (linhas: 42)
+    - NOVO: Salvar crop do objeto detectado em cada foto
+    - NOVO: Enviar foto crop para Telegram junto com foto geral
+    - NOVO: Exibir crop ao lado da foto geral na aba de fotos
+    - NOVO: Linha separadora preta (3px) entre dias diferentes na aba de fotos
+    - IMPLEMENTAÇÃO: Função _extract_object_crop com margem de 15%
+    - MELHORIA: Callback de foto agora inclui path do crop (crop_path)
+    - MELHORIA: Layout da aba de fotos com duas colunas (geral + crop)
+    - RESULTADO: Cada deteção gera 2 fotos persistidas e exibidas
+    - TELEGRAM: Foto crop enviada com prefixo "🔍 ZOOM -"
+
+v4.3.20 (03/02/2026) [BUG FIX - CRÍTICO] (linhas: 1)
+    - FIX CRÍTICO: Corrigido bug da "última foto sem objetos detectados"
+    - CAUSA: Fotos pendentes eram salvas mesmo em frames SEM detecções
+    - CENÁRIO: Com skip_frames=2, último frame processado pode não ter pessoa
+    - PROBLEMA: Foto final chegava ao Telegram vazia/sem caixas de detecção
+    - SOLUÇÃO: Adicionado verificação `and boxes and self._person_present(cids)` na linha 995
+    - RESULTADO: Fotos agora só são tiradas quando há pessoas no frame ATUAL
+    - Garantia: Todas as fotos enviadas têm objetos detectados visíveis
+
+v4.3.19 (02/02/2026) [BUG FIX - CRÍTICO] (linhas: 0)
+    - FIX CRÍTICO: Corrigido bug de "Confiança: 0.0%" em alertas Telegram
+    - CAUSA: conf_avg era recalculado a cada foto usando detecções do frame atual
+    - PROBLEMA: Frames subsequentes sem detecções resultavam em conf_avg=0.0
+    - SOLUÇÃO: Armazenado conf_avg do evento inicial em _event_conf_avg
+    - RESULTADO: Todas as fotos do mesmo evento agora usam a confiança original
+    - Garantia: Valor de confiança consistente em todas as fotos de um evento
+
+v4.2.4 (02/02/2026) [UI POLISH] (linhas: 0) (base v4.3.8)
+    - NOVO: Spinner animado de loading durante conexão/boot das câmeras
+    - NOVO: Indicadores de status descritivos (Iniciando, Conectando, Sem sinal)
+    - NOVO: Logo ⊘ para câmeras desativadas na configuração
+    - MELHORIA: Taxa de transferência em Mbps/MB/s com estimativa JPEG
+    - MELHORIA: Tooltips informativos no cabeçalho da tabela Performance
+    - NOVO: Logs coloridos (vermelho para ERROR, laranja para WARN)
+
+v4.2.3 (02/02/2026) [NETWORK + UI] (linhas: 0) (base v4.2.2)
+    - NOVO: Métricas avançadas de rede na aba Performance
+    - NOVO: Bitrate, Latência, Jitter, Ping, Perda de frames por câmera
+    - NOVO: Indicador de protocolo (UDP/TCP) na performance
+    - NOVO: Alertas visuais (⚠) para valores fora do ideal
+    - MELHORIA: Logs coloridos (vermelho para ERROR, laranja para WARN)
+    - MELHORIA: Status das câmeras com indicador visual (círculo verde intenso)
+
+v4.2.2 (18/01/2026) [PERFORMANCE] (linhas: 0) (base v4.2.1)
+    - OTIMIZAÇÃO: Skip de frames YOLO (processa 1 a cada 3) - reduz carga CPU em 66%
+    - OTIMIZAÇÃO: input_size padrão 320 (era 416) - inferência 2x mais rápida
+    - OTIMIZAÇÃO: Watchdog aumentado de 12s para 20s (tolera rede instável)
+    - NOVO: Parâmetro skip_frames configurável (padrão: 2)
+    - NOVO: Parâmetro input_size configurável (320/416/608)
+    - MELHORIA: UI sempre recebe frames (mesmo pulados) - visualização fluida
+    - FIX: Reduz hard restarts causados por latência de rede
+
+v4.2.1 (18/01/2026) [ESTÁVEL] (linhas: 0) (base v4.1.0)
+    - NOVO: Sistema completo de dicas (tips) explicando cada item do menu de Configurações
+    - NOVO: Checkbox para ativar/desativar exibição de tips (reduz poluição visual)
+    - NOVO: Tooltips automáticos em cada campo quando tips estão ativados
+    - NOVO: Persistência do estado do checkbox de tips em config.ini
+
+v4.1.0 (06/01/2026) [ESTÁVEL] (linhas: 0) (base v4.0.3)
+    - FIX CRÍTICO: migrado TODO o controle temporal sensível (captura/fotos/eventos/reconnect/performance/watchdog) para time.monotonic()
+    - Garantia: min_capture_interval_s agora é respeitado de forma determinística (independente de ajustes no relógio do Windows)
+    - Mantido: timestamps humanos (logs/nomes de arquivo) seguem datetime.now()
+
+v4.0.3 (06/01/2026) [ESTÁVEL] (linhas: 0) (base v3.9.5)
+    - Renomeada a v3.9.5 para v4.0.3 sem alterações funcionais (rollback total)
+    - Mantém correções e robustez consolidadas da base v3.9.5
+
+v4.0.2 (ABANDONADA) (linhas: 0)
+    - Versão descartada (mesmo problema de tela em branco)
+
+v4.0.1 (ABANDONADA) (linhas: 0)
+    - Versão descartada (tela em branco)
+
+v3.9.5 (06/01/2026) [ESTÁVEL] (linhas: 0) (base v3.9.3)
+    - Corrigido crash na inicialização: callback de log apontava para self.ui_log_queue (inexistente)
+    - Compatibilidade com Python < 3.10: removido uso de "int | None" (substituído por Optional[int])
+    - Corrigida duplicação/indentação de RTSPObjectDetector.stop()
+    - Corrigido hard restart: photo_callback enfileirava tupla incompleta
+    - NOVO (persistente): min_capture_interval_s (padrão 1.0s) para impor intervalo mínimo entre imagens salvas
+    - Log de CONFIG DETECTOR agora inclui min_capture_interval_s (min_shot_interval)
+
+v3.9.4 (ABANDONADA) (linhas: 0)
+    - Versão descartada por solicitação do usuário (não usar)
+
+v3.9.3 (01/01/2026) (linhas: 0)
+    - Base robusta RTSP + logs + performance + fotos agrupadas + watchdog
+
+v3.9.1 (01/01/2026) (linhas: 0)
+    - Log detalhado de eventos de movimento com parâmetros ativos
+    - Log explícito de inicialização informando versão
+    - Ajustes finos de padronização de mensagens de log
+    - Consolidação final da documentação de eventos e métricas
+
+v3.9.0 (01/01/2026) (linhas: 0)
+    - Marco de estabilização arquitetural
+    - EVENT_UID definitivo e consistente
+    - Agrupamento visual de fotos por evento
+    - Scroll vertical e horizontal na aba Fotos
+    - Estratégia de evento baseada em cruzamento da linha central
+    - Redução significativa de falsos positivos
+    - Watchdog estável para operação contínua
+================================================================================
+NOTA (linhas):
+    - Neste release, os campos (linhas: 0) ficam como placeholder proposital.
+    - Na próxima interação, eu atualizo o changelog com a contagem REAL por versão.
+================================================================================
 """
 
-APP_VERSION = "4.5.9"
+import os
+import sys
+import cv2
+import numpy as np
+import threading
+import queue
+import configparser
+import urllib.request
+import requests
+import webbrowser
+import json
+import subprocess
+from datetime import datetime
+from pathlib import Path
+import time
+import platform
+from typing import Optional, Callable, Any, Dict, List, Tuple
 
-ok_size > self.max_size:
+try:
+    import psutil  # type: ignore
+    PSUTIL_AVAILABLE = True
+except ImportError:
+    psutil = None
+    PSUTIL_AVAILABLE = False
+
+import tkinter as tk
+from tkinter import ttk, scrolledtext, messagebox
+from PIL import Image, ImageTk, ImageDraw
+
+def set_ffmpeg_capture_options(transport: str = "udp") -> None:
+    mode = (transport or "udp").strip().lower()
+    if mode not in ("udp", "tcp"):
+        mode = "udp"
+    os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = (
+        f"rtsp_transport;{mode}|"
+        "stimeout;8000000|"
+        "rw_timeout;8000000|"
+        "max_delay;300000|"
+        "fflags;nobuffer|"
+        "flags;low_delay|"
+        "reorder_queue_size;0"
+    )
+
+set_ffmpeg_capture_options("udp")
+
+APP_VERSION = "6.0.0"
+MAX_THUMBS = 200
+
+
+def get_commit_code() -> str:
+    """Retorna hash curto do commit atual; fora do git retorna N/A."""
+    try:
+        repo_dir = Path(__file__).resolve().parent
+        out = subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=str(repo_dir),
+            stderr=subprocess.DEVNULL,
+            timeout=2,
+            text=True,
+        )
+        commit = (out or "").strip()
+        return commit if commit else "N/A"
+    except Exception:
+        return "N/A"
+
+# ----------------------------- Tips do Menu de Configurações -----------------------------
+CONFIGURATION_TIPS = {
+    "cam_enabled": "Ative/desative câmeras individuais sem precisar editar a URL RTSP",
+    "cam_rtsp": "URL RTSP da câmera (ex: rtsp://user:pass@192.168.1.100:554/stream)",
+    "cooldown": "Tempo mínimo (em segundos) entre alertas consecutivos da mesma câmera",
+    "confidence": "Confiança mínima para aceitar uma detecção (0.2 = sensível, 0.95 = rigoroso)",
+    "nms": "Supressão de não-máxima: quanto menor, mais detecções (0.2 = muitas, 0.95 = poucas)",
+    "photos": "Quantidade de fotos capturadas por evento de detecção",
+    "min_capture": "Intervalo mínimo (segundos) entre cada foto capturada em um evento",
+    "max_photos": "Número máximo de fotos (geral + crop) mantidas no diretório. Fotos mais antigas são excluídas automaticamente.",
+    "person": "Disparar alerta quando pessoa é detectada",
+    "car": "Disparar alerta quando carro é detectado",
+    "bus": "Disparar alerta quando ônibus é detectado",
+    "truck": "Disparar alerta quando caminhão é detectado",
+    "motorcycle": "Disparar alerta quando motocicleta é detectada",
+    "bicycle": "Disparar alerta quando bicicleta é detectada",
+    "dog": "Disparar alerta quando cachorro é detectado",
+    "cat": "Disparar alerta quando gato é detectado",
+    "bird": "Disparar alerta quando pássaro é detectado",
+    "horse": "Disparar alerta quando cavalo é detectado",
+    "bot_token": "Token do bot Telegram (obtenha com @BotFather)",
+    "chat_id": "ID do chat/grupo Telegram para receber notificações",
+    "alert_mode": "Tipo de alerta: 'all' = eventos de sistema + fotos, 'detections' = somente fotos, 'none' = desativado",
+    "rtsp_transport": "Transporte RTSP: 'udp' (padrão, menor latência) ou 'tcp' (mais estável em redes instáveis)",
+}
+
+
+# ----------------------------- Log -----------------------------
+class LogManager:
+    """Gerenciador de logs padronizado conforme ESPECIFICAÇÃO_LOGS.md
+    
+    Referência: https://github.com/Espaco-CMaker/Guia_de_Padroes/blob/main/ESPECIFICACAO_LOGS.md
+    
+    Características:
+    - Formato: "%(asctime)s | %(levelname)-7s | %(name)-15s | %(message)s"
+    - Rotação automática (5MB por arquivo, 10 backups)
+    - Buffer de eventos para Telegram (reduz spam)
+    - Thread-safe
+    """
+    def __init__(self, log_file: str = "log.txt", max_size_mb: int = 5):
+        self.log_file = Path(log_file)
+        self.max_size = max_size_mb * 1024 * 1024
+        self.callbacks: List[Callable[[str], None]] = []
+        self._lock = threading.Lock()
+        self.telegram = None
+        self._sending_telegram = False
+        
+        # Buffer para eventos de sistema (reduzir mensagens Telegram)
+        self._system_events_buffer = []
+        self._system_events_lock = threading.Lock()
+        self._last_buffer_send_time = time.time()
+        self._buffer_send_interval = 30.0  # Enviar a cada 30 segundos
+        self._buffer_max_events = 10  # Ou quando atingir 10 eventos
+
+    def add_callback(self, cb: Callable[[str], None]) -> None:
+        self.callbacks.append(cb)
+
+    def set_telegram(self, telegram) -> None:
+        self.telegram = telegram
+    
+    def _add_system_event_to_buffer(self, level: str, msg: str, cam: Optional[int], timestamp: str) -> None:
+        """Adiciona evento de sistema ao buffer para envio agrupado."""
+        with self._system_events_lock:
+            if "watchdog" in (msg or "").lower():
+                return
+            # Emoji de nível baseado no tipo de alerta
+            if "RTSP" in msg.upper() or "CONEXÃO" in msg.upper() or "DESCONECT" in msg.upper():
+                level_emoji = "🔴"  # Vermelho para problemas críticos
+            elif "reconnect" in msg.lower() or "watchdog" in msg.lower():
+                level_emoji = "🟠"  # Laranja para warnings
+            else:
+                level_emoji = "🟡"  # Amarelo para informações críticas
+            
+            cam_text = f"CAM{cam}" if cam is not None else "SYS"
+            event_entry = {
+                "emoji": level_emoji,
+                "cam": cam_text,
+                "timestamp": timestamp.split()[1],  # Apenas HH:MM:SS
+                "msg": msg[:80]  # Limitar tamanho da mensagem
+            }
+            self._system_events_buffer.append(event_entry)
+            
+            # Enviar se atingir o limite de eventos
+            if len(self._system_events_buffer) >= self._buffer_max_events:
+                self._flush_system_events_buffer()
+    
+    def _flush_system_events_buffer(self) -> None:
+        """Envia todos os eventos acumulados no buffer em uma única mensagem."""
+        if not self._system_events_buffer:
+            return
+        
+        if self._sending_telegram:
+            return
+        
+        try:
+            self._sending_telegram = True
+            
+            # Construir mensagem consolidada
+            event_count = len(self._system_events_buffer)
+            events_text = "\n".join(
+                f"{ev['emoji']} {ev['timestamp']} [{ev['cam']}] {ev['msg']}"
+                for ev in self._system_events_buffer
+            )
+            
+            caption = (
+                f"⚠️ EVENTOS DE SISTEMA ({event_count})\n"
+                f"{'━' * 8}\n"
+                f"{events_text}\n"
+                f"{'━' * 8}\n"
+                f"v{APP_VERSION}"
+            )
+            
+            self.telegram.enviar_mensagem(caption)
+            self._system_events_buffer.clear()
+            self._last_buffer_send_time = time.time()
+        except Exception:
+            pass
+        finally:
+            self._sending_telegram = False
+    
+    def check_and_flush_buffer(self) -> None:
+        """Verifica se deve enviar buffer baseado no tempo."""
+        with self._system_events_lock:
+            if not self._system_events_buffer:
+                return
+            
+            elapsed = time.time() - self._last_buffer_send_time
+            if elapsed >= self._buffer_send_interval:
+                self._flush_system_events_buffer()
+
+    def _is_critical_connection_issue(self, level: str, msg: str) -> bool:
+        if level not in ("WARN", "ERROR"):
+            return False
+        text = (msg or "").lower()
+        if "watchdog" in text:
+            return False
+        patterns = [
+            "falha rtsp",
+            "sem frame",
+            "sem sinal",
+            "desconect",
+            "rtsp vazio",
+            "hard restart",
+            "soft reconnect",
+            "falha ao recriar câmera",
+            "erro ao conectar",
+        ]
+        return any(p in text for p in patterns)
+
+    def _rotate_if_needed(self) -> None:
+        if not self.log_file.exists():
+            return
+        if self.log_file.stat().st_size > self.max_size:
             backup = self.log_file.with_suffix(".bak")
             try:
                 if backup.exists():
@@ -276,7 +661,7 @@ class TelegramBot:
                 except Exception:
                     pass
 
-    def formatar_msg_inicio(self, cameras_ativas: int, versao: str) -> str:
+    def formatar_msg_inicio(self, cameras_ativas: int, versao: str, commit: str = "N/A") -> str:
         """Formata mensagem amigável de início do sistema."""
         return (
             f"✅ SISTEMA INICIADO\n"
@@ -284,6 +669,7 @@ class TelegramBot:
             f"🎥 Câmeras ativas: {cameras_ativas}\n"
             f"🚀 Status: Monitorando\n"
             f"v{versao}\n"
+            f"commit {commit}\n"
             f"{'━' * 8}"
         )
 
@@ -320,8 +706,6 @@ class RTSPObjectDetector:
         self.log = log
         self.telegram = telegram
 
-        self.network_monitor = None
-
         self.models_dir = Path(models_dir)
         self.foto_dir = Path(foto_dir)
         self.models_dir.mkdir(exist_ok=True)
@@ -338,21 +722,6 @@ class RTSPObjectDetector:
         self.photo_callback = None
 
         self.inf_times: List[float] = []
-        self.last_performance: Dict[str, Any] = {}
-        self.telegram_jpeg_quality = 100
-
-        # Métricas de rede/stream
-        self._frame_timestamps: List[float] = []  # Para calcular jitter
-        self._frame_sizes: List[int] = []  # Para calcular bitrate
-        self._total_frames_received = 0
-        self._total_frames_expected = 0
-        self._last_bitrate_calc_time = 0.0
-        self._bytes_received = 0
-        self._latency_samples: List[float] = []
-        self._ping_ms = 0.0
-        self._last_ping_time = 0.0
-        self._last_est_frame_size = 0
-        self._bitrate_sample_every = 3
 
         # Config runtime
         self.cooldown_s = 2.0
@@ -383,6 +752,26 @@ class RTSPObjectDetector:
         self._pending_shots = 0
         self._event_uid = ""
         self._event_conf_avg = 0.0  # Confiança média do evento (fixada na detecção inicial)
+        self.presence_exit_timeout_s = 3.0
+        self.presence_mid_alert_after_s = 20.0
+        self.presence_min_move_px = 25.0
+        self.presence_enter_confirm_frames = 3
+        self.presence_exit_confirm_frames = 10
+        self.presence_rearm_radius_px = 90.0
+        self.presence_rearm_clear_absence_s = 8.0
+        self._presence_active = False
+        self._presence_mid_sent = False
+        self._presence_start_mono = 0.0
+        self._presence_last_seen_mono = 0.0
+        self._presence_enter_center = None
+        self._presence_last_frame_draw = None
+        self._presence_last_frame_clean = None
+        self._presence_last_boxes = []
+        self._presence_seen_streak = 0
+        self._presence_miss_streak = 0
+        self._presence_latch_active = False
+        self._presence_latch_center = None
+        self._presence_latch_last_seen_mono = 0.0
 
         # Capturas por evento (monotonic)
         self._last_shot_time = 0.0
@@ -578,6 +967,23 @@ class RTSPObjectDetector:
     def _person_present(self, cids) -> bool:
         return 0 in cids  # COCO: person=0
 
+    def _largest_person_box(self, boxes, cids):
+        person_boxes = [b for i, b in enumerate(boxes) if i < len(cids) and cids[i] == 0]
+        if not person_boxes:
+            return None
+        return max(person_boxes, key=lambda b: b[2] * b[3])
+
+    def _box_center(self, box):
+        x, y, w, h = box
+        return (x + (w / 2.0), y + (h / 2.0))
+
+    def _distance_px(self, p1, p2) -> float:
+        if (p1 is None) or (p2 is None):
+            return 0.0
+        dx = float(p1[0]) - float(p2[0])
+        dy = float(p1[1]) - float(p2[1])
+        return float((dx * dx + dy * dy) ** 0.5)
+
     def _extract_object_crop(self, frame_bgr, boxes, margin_percent=15):
         """Extrai crop do maior objeto detectado com margem de 15%."""
         if not boxes:
@@ -633,7 +1039,7 @@ class RTSPObjectDetector:
                 f"Tipo: {type(e).__name__} | "
                 f"Erro: {str(e)}", self.cam_id)
 
-    def _save_and_notify(self, frame_bgr_with_boxes, frame_bgr_clean, boxes, event_uid: str, shot_idx: int, person_count: int, conf_avg: float, detected_classes=None):
+    def _save_and_notify(self, frame_bgr_with_boxes, frame_bgr_clean, boxes, event_uid: str, shot_idx: int, person_count: int, conf_avg: float, detected_classes=None, alert_stage: str = "DETECÇÃO"):
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         safe_uid = (event_uid or "evt").replace(":", "-").replace("/", "-")
         filename = f"{ts}_CAM{self.cam_id}_EVT{safe_uid}_S{shot_idx}.jpg"
@@ -642,20 +1048,15 @@ class RTSPObjectDetector:
         # Limpar fotos antigas se necessário (manter apenas max_photos_keep)
         self._cleanup_old_photos()
 
-        # Salvar foto geral (com boxes) - qualidade configurável
+        # Salvar foto geral (com boxes)
         path = self.foto_dir / filename
-        jpeg_quality = int(getattr(self, "telegram_jpeg_quality", 100) or 100)
-        if jpeg_quality < 1:
-            jpeg_quality = 1
-        if jpeg_quality > 100:
-            jpeg_quality = 100
-        cv2.imwrite(str(path), frame_bgr_with_boxes, [int(cv2.IMWRITE_JPEG_QUALITY), jpeg_quality])
+        cv2.imwrite(str(path), frame_bgr_with_boxes)
         
         # Extrair e salvar crop do objeto detectado
         path_crop = self.foto_dir / filename_crop
         crop = self._extract_object_crop(frame_bgr_clean, boxes)
         if crop is not None:
-            cv2.imwrite(str(path_crop), crop, [int(cv2.IMWRITE_JPEG_QUALITY), jpeg_quality])
+            cv2.imwrite(str(path_crop), crop)
 
         self.log.log(
             "INFO",
@@ -674,19 +1075,8 @@ class RTSPObjectDetector:
                 self.log.log("ERROR", f"Erro no callback de foto: {e}", self.cam_id)
 
         if self.telegram_mode in ("all", "detections") and self.telegram.enabled:
-            # Construir mensagem amigável com dados importantes
-            perf = self.last_performance or {}
-            real_bitrate = self.network_monitor.get_bitrate(self.cam_id) if self.network_monitor else 0.0
-            
             timestamp_formatted = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
             conf_pct = (conf_avg * 100) if conf_avg > 0 else 0
-            
-            # Formatar FPS e latência com 1 casa decimal
-            fps = perf.get('fps', 0)
-            fps_str = f"{fps:.1f}" if isinstance(fps, (int, float)) else "N/A"
-            
-            latency = perf.get('latency', 0)
-            latency_str = f"{latency:.1f}" if isinstance(latency, (int, float)) else "N/A"
             
             # Determinar texto da detecção
             if detected_classes:
@@ -704,13 +1094,12 @@ class RTSPObjectDetector:
             
             # Construir caption formatado (com cores via emojis)
             caption = (
-                f"🟢 ALERTA DE DETECÇÃO\n"
+                f"🟢 ALERTA {alert_stage}\n"
                 f"{'━' * 8}\n"
                 f"📹 Câmera {self.cam_id}\n"
                 f"⏰ {timestamp_formatted}\n"
                 f"🔍 Detectado: {detection_text}\n"
                 f"{confidence_emoji} Confiança: {conf_pct:.1f}%\n"
-                f"📡 FPS: {fps_str} | Latência: {latency_str}ms\n"
                 f"v{APP_VERSION}"
             )
             
@@ -755,6 +1144,18 @@ class RTSPObjectDetector:
             self._pending_shots = 0
             self._last_shot_time = 0.0
             self._last_event_time = 0.0
+            self._presence_active = False
+            self._presence_mid_sent = False
+            self._presence_last_seen_mono = 0.0
+            self._presence_enter_center = None
+            self._presence_last_frame_draw = None
+            self._presence_last_frame_clean = None
+            self._presence_last_boxes = []
+            self._presence_seen_streak = 0
+            self._presence_miss_streak = 0
+            self._presence_latch_active = False
+            self._presence_latch_center = None
+            self._presence_latch_last_seen_mono = 0.0
             self.last_frame_mono = 0.0
             self.last_frame_wall_ts = 0.0
             self.log.log("INFO", "Soft reconnect completed successfully", self.cam_id)
@@ -775,8 +1176,6 @@ class RTSPObjectDetector:
 
             self._log_detector_config()
 
-            frame_count = 0
-            start_mono = time.monotonic()
             self.last_frame_timestamp = time.time()
 
             while self.running:
@@ -827,24 +1226,6 @@ class RTSPObjectDetector:
                 if self.status == "online":
                     self.status = "receiving"
 
-                # Coletar métricas de rede
-                self._total_frames_received += 1
-                self._frame_timestamps.append(now_wall)
-                if self._bitrate_sample_every > 0 and (self._total_frames_received % self._bitrate_sample_every) == 0:
-                    frame_size = self._estimate_frame_size_bytes(frame)
-                    self._last_est_frame_size = frame_size
-                else:
-                    frame_size = self._last_est_frame_size or self._estimate_frame_size_bytes(frame)
-                self._frame_sizes.append(frame_size)
-                self._bytes_received += frame_size
-
-                # Manter apenas últimos 100 frames para cálculos
-                if len(self._frame_timestamps) > 100:
-                    self._frame_timestamps.pop(0)
-                    self._frame_sizes.pop(0)
-
-                frame_count += 1
-
                 # OTIMIZAÇÃO: Skip de processamento YOLO (reduz carga em 66% com skip=2)
                 # Frame RAW é sempre enviado para UI, mas YOLO só processa 1 a cada (skip+1) frames
                 self._frame_skip_counter += 1
@@ -862,62 +1243,116 @@ class RTSPObjectDetector:
                 if frame.std() < 5.0:
                     continue
 
-                # Medir latência de processamento
-                process_start = time.time()
                 boxes, confs, cids, inf_time = self._detect(frame)
                 self.inf_times.append(inf_time)
                 frame_draw = self._draw_boxes(frame, boxes, confs, cids)
-                process_end = time.time()
-                self._latency_samples.append(process_end - process_start)
 
-                # Disparo de evento (monotonic)
-                if boxes and self._person_present(cids):
-                    if (now_mono - self._last_event_time) >= self.cooldown_s and self._pending_shots <= 0:
-                        evt_ts = int(time.time())  # carimbo humano apenas
+                person_present = bool(boxes and self._person_present(cids))
+                largest_person = self._largest_person_box(boxes, cids) if person_present else None
+                person_center = self._box_center(largest_person) if largest_person is not None else None
+
+                if person_present:
+                    self._presence_seen_streak += 1
+                    self._presence_miss_streak = 0
+                    self._presence_last_seen_mono = now_mono
+                    self._presence_last_frame_draw = frame_draw.copy()
+                    self._presence_last_frame_clean = frame.copy()
+                    self._presence_last_boxes = [list(b) for b in boxes]
+
+                    if self._presence_latch_active:
+                        self._presence_latch_last_seen_mono = now_mono
+                        if (self._presence_latch_center is not None) and (person_center is not None):
+                            moved = self._distance_px(person_center, self._presence_latch_center)
+                            if moved > (self.presence_rearm_radius_px * 1.5):
+                                self._presence_latch_active = False
+                                self._presence_latch_center = None
+
+                    can_enter = (
+                        (not self._presence_active)
+                        and (self._presence_seen_streak >= self.presence_enter_confirm_frames)
+                        and ((now_mono - self._last_event_time) >= self.cooldown_s)
+                    )
+
+                    blocked_by_latch = False
+                    if self._presence_latch_active and (self._presence_latch_center is not None) and (person_center is not None):
+                        blocked_by_latch = self._distance_px(person_center, self._presence_latch_center) <= self.presence_rearm_radius_px
+
+                    if can_enter and (not blocked_by_latch):
+                        evt_ts = int(time.time())
                         self._event_uid = f"{self.cam_id}-{evt_ts}-{self.detections_total + 1}"
-                        self._pending_shots = int(max(1, self.photos_per_event))
+                        self._event_conf_avg = (sum(confs) / len(confs)) if confs else 0.0
+                        self._presence_active = True
+                        self._presence_mid_sent = False
+                        self._presence_start_mono = now_mono
+                        self._presence_enter_center = person_center
                         self._last_event_time = now_mono
-                        self._last_shot_time = 0.0
                         self.detections_total += 1
 
+                        self._presence_latch_active = True
+                        self._presence_latch_center = person_center
+                        self._presence_latch_last_seen_mono = now_mono
+
                         person_count = sum(1 for cid in cids if cid == 0)
-                        conf_avg = (sum(confs) / len(confs)) if confs else 0.0
-                        self._event_conf_avg = conf_avg  # Armazena confiança do evento
-                        best_conf = max(confs) if confs else 0.0
-                        total_boxes = len(boxes)
-
-                        self.log.log(
-                            "INFO",
-                            "EVENTO MOVIMENTO/DETECCAO | "
-                            f"evt={self._event_uid} | pessoas={person_count} | boxes={total_boxes} | "
-                            f"conf_avg={conf_avg:.2f} | conf_max={best_conf:.2f} | "
-                            f"cooldown={self.cooldown_s:.2f}s | conf_th={self.conf_th:.2f} | nms_th={self.nms_th:.2f} | "
-                            f"photos={self._pending_shots} | min_shot_interval={self._min_shot_interval:.2f}s | "
-                            f"min_capture_interval_s={self.min_capture_interval_s:.2f}s | v{APP_VERSION}",
-                            self.cam_id
+                        detected_class_names = []
+                        for cid in set(cids):
+                            if self.classes and cid < len(self.classes):
+                                detected_class_names.append(self.classes[cid])
+                        self._save_and_notify(
+                            frame_draw, frame, boxes, self._event_uid, 1, person_count, self._event_conf_avg,
+                            detected_class_names, alert_stage="ENTRADA"
                         )
+                        self.log.log("INFO", f"EVENTO ENTRADA | evt={self._event_uid} | v{APP_VERSION}", self.cam_id)
 
-                # Fotos pendentes (monotonic + limite global)
-                # FIX CRÍTICO v4.3.20: só salvar foto se houver detecções no frame atual
-                if self._pending_shots > 0 and boxes and self._person_present(cids):
-                    if (now_mono - self._last_shot_time) >= self._min_shot_interval:
-                        if (now_mono - self._last_capture_time_global) >= self.min_capture_interval_s:
+                    if self._presence_active and (not self._presence_mid_sent):
+                        elapsed = now_mono - self._presence_start_mono
+                        move_px = self._distance_px(person_center, self._presence_enter_center)
+                        if elapsed >= self.presence_mid_alert_after_s and move_px <= self.presence_min_move_px:
                             person_count = sum(1 for cid in cids if cid == 0)
-                            # Usa confiança armazenada do evento (não recalcula)
-                            conf_avg = self._event_conf_avg
-                            shot_idx = (int(self.photos_per_event) - int(self._pending_shots) + 1)
-                            
-                            # Coletar nomes das classes detectadas
                             detected_class_names = []
                             for cid in set(cids):
                                 if self.classes and cid < len(self.classes):
                                     detected_class_names.append(self.classes[cid])
+                            self._save_and_notify(
+                                frame_draw, frame, boxes, self._event_uid, 2, person_count, self._event_conf_avg,
+                                detected_class_names, alert_stage="MEIO"
+                            )
+                            self._presence_mid_sent = True
+                            self.log.log("INFO", f"EVENTO MEIO | evt={self._event_uid} | v{APP_VERSION}", self.cam_id)
+                else:
+                    self._presence_miss_streak += 1
+                    self._presence_seen_streak = 0
 
-                            self._save_and_notify(frame_draw, frame, boxes, self._event_uid, shot_idx, person_count, conf_avg, detected_class_names)
+                    if self._presence_active:
+                        since_seen = now_mono - self._presence_last_seen_mono
+                        if (since_seen >= self.presence_exit_timeout_s) and (self._presence_miss_streak >= self.presence_exit_confirm_frames):
+                            if self._presence_last_frame_draw is not None and self._presence_last_frame_clean is not None:
+                                self._save_and_notify(
+                                    self._presence_last_frame_draw,
+                                    self._presence_last_frame_clean,
+                                    self._presence_last_boxes,
+                                    self._event_uid,
+                                    3,
+                                    0,
+                                    self._event_conf_avg,
+                                    ["saida"],
+                                    alert_stage="SAÍDA",
+                                )
+                            self.log.log("INFO", f"EVENTO SAÍDA | evt={self._event_uid} | v{APP_VERSION}", self.cam_id)
+                            self._presence_active = False
+                            self._presence_mid_sent = False
+                            self._presence_start_mono = 0.0
+                            self._presence_last_seen_mono = 0.0
+                            self._presence_enter_center = None
+                            self._presence_last_frame_draw = None
+                            self._presence_last_frame_clean = None
+                            self._presence_last_boxes = []
+                            self._presence_miss_streak = 0
 
-                            self._pending_shots -= 1
-                            self._last_shot_time = now_mono
-                            self._last_capture_time_global = now_mono
+                    if self._presence_latch_active:
+                        clear_for = now_mono - self._presence_latch_last_seen_mono
+                        if clear_for >= self.presence_rearm_clear_absence_s:
+                            self._presence_latch_active = False
+                            self._presence_latch_center = None
 
                 if self.frame_callback:
                     try:
@@ -925,39 +1360,7 @@ class RTSPObjectDetector:
                     except Exception as e:
                         self.log.log("ERROR", f"Erro no callback de frame: {e}", self.cam_id)
 
-                # Performance (monotonic)
-                if frame_count % 200 == 0:
-                    elapsed = time.monotonic() - start_mono
-                    fps = frame_count / elapsed if elapsed > 0 else 0
-                    if PSUTIL_AVAILABLE:
-                        cpu_percent = psutil.cpu_percent(interval=None)
-                        ram_percent = psutil.virtual_memory().percent
-                    else:
-                        cpu_percent = 0.0
-                        ram_percent = 0.0
-                    avg_inf = sum(self.inf_times) / len(self.inf_times) if self.inf_times else 0
-                    gpu_info = "CUDA" if cv2.cuda.getCudaEnabledDeviceCount() > 0 else "CPU"
-                    
-                    # Calcular métricas de rede
-                    bitrate_mbs = self._calculate_bitrate()
-                    bitrate_mbps = bitrate_mbs * 8.0
-                    latency_ms = self._calculate_latency()
-                    jitter_ms = self._calculate_jitter()
-                    frame_loss = self._calculate_frame_loss()
-                    transport = os.environ.get("OPENCV_FFMPEG_CAPTURE_OPTIONS", "")
-                    protocol = "UDP" if "udp" in transport.lower() else "TCP" if "tcp" in transport.lower() else "?"
-                    
-                    # Ping (atualizar a cada 10 segundos)
-                    if now_wall - self._last_ping_time > 10.0:
-                        self._ping_ms = self._measure_ping()
-                        self._last_ping_time = now_wall
-                    
-                    self.last_performance = {
-                        "fps": fps, "cpu": cpu_percent, "ram": ram_percent,
-                        "inf_time": avg_inf, "gpu": gpu_info, "detections": self.detections_total,
-                        "bitrate": bitrate_mbps, "latency": latency_ms, "jitter": jitter_ms,
-                        "ping": self._ping_ms, "protocol": protocol, "frame_loss": frame_loss
-                    }
+                if len(self.inf_times) > 400:
                     self.inf_times.clear()
 
         finally:
@@ -967,477 +1370,99 @@ class RTSPObjectDetector:
             except Exception:
                 pass
 
-    def _calculate_bitrate(self) -> float:
-        """Calcula taxa de transferência em MB/s baseado nos últimos frames"""
-        try:
-            if len(self._frame_sizes) < 2:
-                return 0.0
-            total_bytes = sum(self._frame_sizes)
-            time_span = self._frame_timestamps[-1] - self._frame_timestamps[0]
-            if time_span <= 0:
-                return 0.0
-            bytes_per_sec = total_bytes / time_span
-            return bytes_per_sec / 1_000_000  # Converter para MB/s
-        except Exception:
-            return 0.0
-
-    def _estimate_frame_size_bytes(self, frame) -> int:
-        """Estima tamanho do frame comprimido (JPEG) para aproximar taxa real"""
-        try:
-            encode_params = [int(cv2.IMWRITE_JPEG_QUALITY), 70]
-            ok, buf = cv2.imencode(".jpg", frame, encode_params)
-            if ok:
-                return int(len(buf))
-        except Exception:
-            pass
-        try:
-            if hasattr(frame, "nbytes"):
-                return int(frame.nbytes)
-        except Exception:
-            pass
-        return 0
-
-    def _calculate_latency(self) -> float:
-        """Calcula latência estimada em ms (tempo entre captura e processamento)"""
-        try:
-            if len(self._latency_samples) > 0:
-                avg_latency = sum(self._latency_samples) / len(self._latency_samples)
-                self._latency_samples.clear()
-                return avg_latency * 1000  # Converter para ms
-            return 0.0
-        except Exception:
-            return 0.0
-
-    def _calculate_jitter(self) -> float:
-        """Calcula jitter em ms (variação no intervalo entre frames)"""
-        try:
-            if len(self._frame_timestamps) < 3:
-                return 0.0
-            intervals = []
-            for i in range(1, len(self._frame_timestamps)):
-                intervals.append(self._frame_timestamps[i] - self._frame_timestamps[i-1])
-            if len(intervals) < 2:
-                return 0.0
-            avg_interval = sum(intervals) / len(intervals)
-            variance = sum((x - avg_interval) ** 2 for x in intervals) / len(intervals)
-            jitter = (variance ** 0.5) * 1000  # Converter para ms
-            return jitter
-        except Exception:
-            return 0.0
-
-    def _calculate_frame_loss(self) -> float:
-        """Calcula perda de frames estimada em %"""
-        try:
-            if self._total_frames_received < 10:
-                return 0.0
-            # Estimar frames esperados baseado no FPS ideal (assumindo 25 FPS)
-            if len(self._frame_timestamps) >= 2:
-                time_span = self._frame_timestamps[-1] - self._frame_timestamps[0]
-                expected = time_span * 25  # 25 FPS esperado
-                received = len(self._frame_timestamps)
-                if expected > 0:
-                    loss = ((expected - received) / expected) * 100
-                    return max(0.0, min(100.0, loss))  # Limitar entre 0-100%
-            return 0.0
-        except Exception:
-            return 0.0
-
-    def _measure_ping(self) -> float:
-        """Mede ping para o host da câmera em ms"""
-        try:
-            import re
-            import subprocess
-            # Extrair hostname/IP da URL RTSP
-            match = re.search(r'rtsp://(?:[^:@]+:[^:@]+@)?([^:/]+)', self.rtsp_url)
-            if not match:
-                return 0.0
-            host = match.group(1)
-            # Executar ping (1 pacote, timeout 2s)
-            result = subprocess.run(
-                ["ping", "-n", "1", "-w", "2000", host],
-                capture_output=True,
-                text=True,
-                timeout=3
-            )
-            # Procurar tempo de resposta no output
-            time_match = re.search(r'tempo[=<](\d+)ms', result.stdout, re.IGNORECASE)
-            if time_match:
-                return float(time_match.group(1))
-            return 0.0
-        except Exception:
-            return 0.0
-
-
 # ----------------------------- UI -----------------------------
 class InterfaceGrafica:
-    def __init__(self, root):
+    def __init__(self, root: tk.Tk):
         self.root = root
-        # Inicialize primeiro a configuração
+        self.root.title(f"AlertaIntruso v{APP_VERSION} — 4 Câmeras RTSP (YOLO)")
+        self.root.geometry("1400x850")
+
         self.config_file = Path("config.ini")
         self.config = configparser.ConfigParser()
-        self.config.read(self.config_file, encoding="utf-8")
 
-        # Inicialize os frames principais
-        self.frame_scan = ttk.Frame(self.root)
-        self.frame_scan.pack(fill="both", expand=True)
+        self.log = LogManager("log.txt", max_size_mb=5)  # 5MB conforme padrão do guia
 
-        # Só depois de tudo pronto, construa a interface da aba
-        self._build_scan_tab()
-    def _build_scan_tab(self):
-        """Cria a interface da aba de busca de câmeras RTSP na rede local."""
-        container = ttk.Frame(self.frame_scan)
-        container.pack(fill="both", expand=True, padx=10, pady=10)
+        # Queues precisam existir antes do callback do log
+        self.frame_queue = queue.Queue()
+        self.photo_queue = queue.Queue()
+        self.log_queue = queue.Queue()
 
-        left = ttk.Frame(container)
-        left.pack(side="left", fill="both", expand=True)
-        right = ttk.Frame(container)
-        right.pack(side="right", fill="y", padx=(20,0))
+        self.log.add_callback(lambda line: self.log_queue.put(line))
 
-        label = ttk.Label(left, text="Buscar câmeras IP na rede local (porta RTSP 554)", font=("Arial", 12, "bold"))
-        label.pack(pady=(12, 8))
+        # Cabeçalho de inicialização padronizado (ESPECIFICACAO_LOGS.md)
+        separator = "=" * 80
+        self.log.log("INFO", separator)
+        self.log.log("INFO", f"Application: AlertaIntruso v{APP_VERSION}")
+        self.log.log("INFO", f"Python: {platform.python_version()}")
+        self.log.log("INFO", f"OS: {platform.system()} {platform.release()}")
+        self.log.log("INFO", f"OpenCV: {cv2.__version__}")
+        self.log.log("INFO", f"Working Directory: {Path.cwd()}")
+        self.log.log("INFO", separator)
 
-        desc = ttk.Label(left, text="Clique em 'Buscar' para escanear a rede local e encontrar dispositivos com RTSP ativo.", foreground="#444444")
-        desc.pack(pady=(0, 10))
-
-        btn_scan = ttk.Button(left, text="Buscar Câmeras", command=self._scan_rtsp_cameras)
-        btn_scan.pack(pady=(0, 12))
-
-        columns = ("ip", "mac", "desc")
-        self.scan_result_tree = ttk.Treeview(left, columns=columns, show="headings", height=10)
-        self.scan_result_tree.heading("ip", text="IP")
-        self.scan_result_tree.heading("mac", text="MAC")
-        self.scan_result_tree.heading("desc", text="Descrição")
-        self.scan_result_tree.column("ip", width=120, anchor="center")
-        self.scan_result_tree.column("mac", width=140, anchor="center")
-        self.scan_result_tree.column("desc", width=260, anchor="w")
-        self.scan_result_tree.pack(padx=0, pady=(0, 10), fill="x")
-
-        self.btn_add_camera = ttk.Button(left, text="Adicionar à Configuração", state="disabled", command=self._add_selected_camera)
-        self.btn_add_camera.pack(pady=(0, 10))
-
-        self.scan_result_tree.bind('<<TreeviewSelect>>', self._on_scan_select)
-
-        # Campos usuário/senha
-        ttk.Label(right, text="Usuário:").pack(anchor="w")
-        self.scan_user = ttk.Entry(right, width=18)
-        self.scan_user.pack(anchor="w", pady=(0, 8))
-        self.scan_user.insert(0, self.config.get("SCAN", "user", fallback="admin"))
-
-        pass_frame = ttk.Frame(right)
-        pass_frame.pack(anchor="w", pady=(0, 8))
-        ttk.Label(pass_frame, text="Senha:").pack(side="left")
-        self.scan_pass = ttk.Entry(pass_frame, width=14, show="*")
-        self.scan_pass.pack(side="left")
-        self.scan_pass.insert(0, self.config.get("SCAN", "pass", fallback="senha"))
-
-        def save_scan_user_pass(event=None):
-            if "SCAN" not in self.config:
-                self.config["SCAN"] = {}
-            self.config["SCAN"]["user"] = self.scan_user.get().strip()
-            self.config["SCAN"]["pass"] = self.scan_pass.get().strip()
-            with open(self.config_file, "w", encoding="utf-8") as f:
-                self.config.write(f)
-        self.scan_user.bind("<FocusOut>", save_scan_user_pass)
-        self.scan_pass.bind("<FocusOut>", save_scan_user_pass)
-
-        self.show_pass_var = tk.BooleanVar(value=False)
-        def toggle_pass():
-            self.scan_pass.config(show="" if self.show_pass_var.get() else "*")
-        show_btn = ttk.Checkbutton(pass_frame, text="Visualizar", variable=self.show_pass_var, command=toggle_pass)
-        show_btn.pack(side="left", padx=(6,0))
-
-        self.btn_test_stream = ttk.Button(right, text="Testar Stream", command=self._test_scan_stream)
-        self.btn_test_stream.pack(anchor="w", pady=(12, 0))
-
-        self.test_frame_box = ttk.LabelFrame(right, text="Prévia da Imagem", padding=4)
-        self.test_frame_box.pack(anchor="w", pady=(8, 0), fill="both")
-        self.test_frame_label = ttk.Label(self.test_frame_box)
-        self.test_frame_label.pack()
-
-        ttk.Label(right, text="Caminho RTSP:").pack(anchor="w", pady=(10,0))
-        self.scan_path_var = tk.StringVar()
-        self.scan_path_combo = ttk.Combobox(right, textvariable=self.scan_path_var, width=32, state="readonly")
-        self.scan_path_combo.pack(anchor="w", pady=(0, 8))
-        self.scan_path_combo['values'] = []
-        self.scan_path_combo.set("")
-
-        self.show_pass_var = tk.BooleanVar(value=False)
-        def toggle_pass():
-            self.scan_pass.config(show="" if self.show_pass_var.get() else "*")
-        show_btn = ttk.Checkbutton(pass_frame, text="Visualizar", variable=self.show_pass_var, command=toggle_pass)
-        show_btn.pack(side="left", padx=(6,0))
-
-        # Botão Testar
-        self.btn_test_stream = ttk.Button(right, text="Testar Stream", command=self._test_scan_stream)
-        self.btn_test_stream.pack(anchor="w", pady=(12, 0))
-
-        self.test_frame_box = ttk.LabelFrame(right, text="Prévia da Imagem", padding=4)
-        self.test_frame_box.pack(anchor="w", pady=(8, 0), fill="both")
-        self.test_frame_label = ttk.Label(self.test_frame_box)
-        self.test_frame_label.pack()
-
-        ttk.Label(right, text="Caminho RTSP:").pack(anchor="w", pady=(10,0))
-        self.scan_path_var = tk.StringVar()
-        self.scan_path_combo = ttk.Combobox(right, textvariable=self.scan_path_var, width=32, state="readonly")
-        self.scan_path_combo.pack(anchor="w", pady=(0, 8))
-        self.scan_path_combo['values'] = []
-        self.scan_path_combo.set("")
-
-    def _scan_rtsp_cameras(self):
-        """Inicia busca real por câmeras RTSP na rede local (porta 554)."""
-        import threading, socket
-        from queue import Queue
-
-        for i in self.scan_result_tree.get_children():
-            self.scan_result_tree.delete(i)
-        self.btn_add_camera.config(state="disabled")
-        self.scan_result_tree.insert("", "end", values=("Buscando...", "", "Aguarde..."))
-        self.frame_scan.update_idletasks()
-
-        def get_local_base_ip():
-            try:
-                s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-                s.connect(("8.8.8.8", 80))
-                ip = s.getsockname()[0]
-                s.close()
-                return ".".join(ip.split(".")[:3]) + "."
-            except Exception:
-                return "192.168.1."
-
-        def scan_ip(ip, port, timeout, result_queue):
-            try:
-                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                sock.settimeout(timeout)
-                sock.connect((ip, port))
-                sock.close()
-                result_queue.put(ip)
-            except Exception:
-                pass
-
-        def scan_range():
-            base = get_local_base_ip()
-            port = 554
-            timeout = 0.5
-            threads = []
-            result_queue = Queue()
-            for i in range(1, 255):
-                ip = f"{base}{i}"
-                t = threading.Thread(target=scan_ip, args=(ip, port, timeout, result_queue))
-                t.daemon = True
-                t.start()
-                threads.append(t)
-            for t in threads:
-                t.join()
-            found = []
-            while not result_queue.empty():
-                found.append(result_queue.get())
-            # Ordenar IPs numericamente
-            def ip_key(ip):
-                return tuple(int(part) for part in ip.split("."))
-            found.sort(key=ip_key)
-            for i in self.scan_result_tree.get_children():
-                self.scan_result_tree.delete(i)
-            if found:
-                # Tentar obter MAC e descrição
-                import subprocess, socket
-                arp_table = {}
-                try:
-                    output = subprocess.check_output("arp -a", shell=True, encoding="utf-8", errors="ignore")
-                    for line in output.splitlines():
-                        parts = line.split()
-                        if len(parts) >= 2 and parts[1].count(":") >= 2:
-                            arp_table[parts[0]] = parts[1]
-                except Exception:
-                    pass
-                for ip in found:
-                    mac = arp_table.get(ip, "-")
-                    desc = "-"
-                    # Tentar hostname
-                    try:
-                        desc = socket.gethostbyaddr(ip)[0]
-                    except Exception:
-                        pass
-                    # Tentar identificar fabricante pelo MAC
-                    if mac != "-" and desc == "-":
-                        oui = mac.upper().replace(":","")[:6]
-                        # Pequeno dicionário de exemplos
-                        mac_vendors = {"001C7F": "Hikvision", "AC64DD": "Dahua", "000C29": "VMware", "A0C562": "Intelbras"}
-                        if oui in mac_vendors:
-                            desc = mac_vendors[oui]
-                    self.scan_result_tree.insert("", "end", values=(ip, mac, desc))
-            else:
-                self.scan_result_tree.insert("", "end", values=("Nenhuma câmera encontrada", "", ""))
-            self.btn_add_camera.config(state="disabled")
-
-        threading.Thread(target=scan_range, daemon=True).start()
-
-    def _on_scan_select(self, event):
-        sel = self.scan_result_tree.selection()
-        if sel:
-            self.btn_add_camera.config(state="normal")
-            ip = self.scan_result_tree.item(sel[0])['values'][0]
-            if not ip or "câmera" in str(ip).lower() or ip == "Buscando...":
-                self.btn_add_camera.config(state="disabled")
-                self.scan_path_combo['values'] = []
-                self.scan_path_combo.set("")
-                return
-            user = self.scan_user.get().strip() or "admin"
-            pwd = self.scan_pass.get().strip() or "senha"
-            caminhos = [
-                f"/stream1",
-                f"/h264",
-                f"/live",
-                f"/cam/realmonitor?channel=1&subtype=0",
-                f":554/Streaming/Channels/101/",
-                f"/user={user}&password={pwd}&channel=1&stream=0.sdp?real_stream",
-                f"/axis-media/media.amp",
-                f"/mpeg4",
-                f"/video",
-            ]
-            self.scan_path_combo['values'] = caminhos
-            if not self.scan_path_var.get() or self.scan_path_var.get() not in caminhos:
-                self.scan_path_combo.set(caminhos[0])
-        else:
-            self.btn_add_camera.config(state="disabled")
-            self.scan_path_combo['values'] = []
-            self.scan_path_combo.set("")
-
-    def _add_selected_camera(self):
-        sel = self.scan_result_tree.selection()
-        if not sel:
-            return
-        ip = self.scan_result_tree.item(sel[0])['values'][0]
-        if not ip or "câmera" in str(ip).lower() or ip == "Buscando...":
-            return
-        if ":" in ip:
-            ip = ip.split()[0]
-        user = self.scan_user.get().strip() or "admin"
-        pwd = self.scan_pass.get().strip() or "senha"
-        path = self.scan_path_var.get().strip() or "/stream1"
-        # Monta URL RTSP
-        if path.startswith(":554"):
-            # Caminho que já inclui porta
-            rtsp_url = f"rtsp://{user}:{pwd}@{ip}{path}"
-        elif path.startswith("/user="):
-            # Caminho com user e senha no path
-            rtsp_url = f"rtsp://{ip}{path}"
-        else:
-            rtsp_url = f"rtsp://{user}:{pwd}@{ip}{path}"
-        campos = [self.e_rtsp1, self.e_rtsp2, self.e_rtsp3, self.e_rtsp4]
-        for campo in campos:
-            if not campo.get().strip():
-                campo.delete(0, tk.END)
-                campo.insert(0, rtsp_url)
-                messagebox.showinfo("Câmera adicionada", f"URL adicionada: {rtsp_url}")
-                return
-        if messagebox.askyesno("Todos preenchidos", "Todos os campos RTSP estão preenchidos. Deseja sobrescrever CAM1?"):
-            self.e_rtsp1.delete(0, tk.END)
-            self.e_rtsp1.insert(0, rtsp_url)
-            messagebox.showinfo("Câmera adicionada", f"URL adicionada em CAM1: {rtsp_url}")
-
-    def _test_scan_stream(self):
-        import cv2
-        ip = None
-        sel = self.scan_result_tree.selection()
-        if sel:
-            ip = self.scan_result_tree.item(sel[0])['values'][0]
-            if not ip or "câmera" in str(ip).lower() or ip == "Buscando...":
-                messagebox.showerror("Teste de Stream", "Selecione uma câmera válida na lista.")
-                return
-            if ":" in ip:
-                ip = ip.split()[0]
-        user = self.scan_user.get().strip() or "admin"
-        pwd = self.scan_pass.get().strip() or "senha"
-        path = self.scan_path_var.get().strip() or "/stream1"
-        if not ip:
-            messagebox.showerror("Teste de Stream", "Selecione uma câmera na lista.")
-            return
-        if path.startswith(":554"):
-            rtsp_url = f"rtsp://{user}:{pwd}@{ip}{path}"
-        elif path.startswith("/user="):
-            rtsp_url = f"rtsp://{ip}{path}"
-        else:
-            rtsp_url = f"rtsp://{user}:{pwd}@{ip}{path}"
-        self.test_frame_label.config(text="Testando stream...")
-        self.frame_scan.update_idletasks()
         try:
-            cap = cv2.VideoCapture(rtsp_url)
-            ret, frame = cap.read()
-            cap.release()
-            if ret and frame is not None and hasattr(frame, "size") and frame.size > 0:
-                # Mostrar frame reduzido
-                import PIL.Image, PIL.ImageTk
-                img = PIL.Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-                img = img.resize((180, 120))
-                img_tk = PIL.ImageTk.PhotoImage(img)
-                self.test_frame_label.config(image=img_tk, text="")
-                self.test_frame_label.image = img_tk
-                self.log.log("INFO", f"Teste RTSP OK: {rtsp_url}")
-            else:
-                self.test_frame_label.config(image="", text="Falha ao obter frame.")
-                self.log.log("ERROR", f"Teste RTSP falhou: {rtsp_url}")
-                messagebox.showerror("Teste de Stream", f"Falha ao obter frame da stream RTSP.\nURL: {rtsp_url}")
-        except Exception as e:
-            self.test_frame_label.config(image="", text="Erro ao testar stream.")
-            self.log.log("ERROR", f"Teste RTSP erro: {rtsp_url} | {e}")
-            messagebox.showerror("Teste de Stream", f"Erro ao testar stream RTSP.\nURL: {rtsp_url}\nErro: {e}")
-        idx = self.scan_result_list.curselection()
-        if not idx:
-            return
-        ip = self.scan_result_list.get(idx[0])
-        if ":" in ip:
-            ip = ip.split()[0]
-        user = self.scan_user.get().strip() or "admin"
-        pwd = self.scan_pass.get().strip() or "senha"
-        path = self.scan_path_var.get().strip() or "/stream1"
-        # Monta URL RTSP
-        if path.startswith(":554"):
-            # Caminho que já inclui porta
-            rtsp_url = f"rtsp://{user}:{pwd}@{ip}{path}"
-        elif path.startswith("/user="):
-            # Caminho com user e senha no path
-            rtsp_url = f"rtsp://{ip}{path}"
-        else:
-            rtsp_url = f"rtsp://{user}:{pwd}@{ip}{path}"
-        campos = [self.e_rtsp1, self.e_rtsp2, self.e_rtsp3, self.e_rtsp4]
-        for campo in campos:
-            if not campo.get().strip():
-                campo.delete(0, tk.END)
-                campo.insert(0, rtsp_url)
-                messagebox.showinfo("Câmera adicionada", f"URL adicionada: {rtsp_url}")
-                return
-        if messagebox.askyesno("Todos preenchidos", "Todos os campos RTSP estão preenchidos. Deseja sobrescrever CAM1?"):
-            self.e_rtsp1.delete(0, tk.END)
-            self.e_rtsp1.insert(0, rtsp_url)
-            messagebox.showinfo("Câmera adicionada", f"URL adicionada em CAM1: {rtsp_url}")
+            cv2.setLogCallback(lambda level, msg: self.log.log("INFO", f"OpenCV [{level}]: {msg.strip()}"))
+        except Exception:
+            self.log.log("WARN", "cv2.setLogCallback não disponível. Logs do OpenCV não serão capturados.")
 
-            def _on_scan_select(self, event):
-                if self.scan_result_list.curselection():
-                    self.btn_add_camera.config(state="normal")
-                else:
-                    self.btn_add_camera.config(state="disabled")
+        self.old_stderr = sys.stderr
+        try:
+            r, w = os.pipe()
+            self.stderr_r = os.fdopen(r, "r")
+            sys.stderr = os.fdopen(w, "w")
+            threading.Thread(target=self._read_stderr, daemon=True).start()
+        except Exception:
+            self.log.log("WARN", "Falha ao redirecionar stderr. Prosseguindo sem captura.")
 
-            def _add_selected_camera(self):
-                idx = self.scan_result_list.curselection()
-                if not idx:
-                    return
-                ip = self.scan_result_list.get(idx[0])
-                if ":" in ip:
-                    ip = ip.split()[0]  # Remove qualquer texto extra
-                rtsp_url = f"rtsp://admin:senha@{ip}/stream1"
-                # Preencher o próximo campo vazio na aba Config
-                campos = [self.e_rtsp1, self.e_rtsp2, self.e_rtsp3, self.e_rtsp4]
-                for campo in campos:
-                    if not campo.get().strip():
-                        campo.delete(0, tk.END)
-                        campo.insert(0, rtsp_url)
-                        messagebox.showinfo("Câmera adicionada", f"URL adicionada: {rtsp_url}\n\nEdite usuário/senha se necessário.")
-                        return
-                # Se todos preenchidos, perguntar se deseja sobrescrever CAM1
-                if messagebox.askyesno("Todos preenchidos", "Todos os campos RTSP estão preenchidos. Deseja sobrescrever CAM1?"):
-                    self.e_rtsp1.delete(0, tk.END)
-                    self.e_rtsp1.insert(0, rtsp_url)
-                    messagebox.showinfo("Câmera adicionada", f"URL adicionada em CAM1: {rtsp_url}\n\nEdite usuário/senha se necessário.")
+        self._load_or_create_config()
+        self.cam_status_labels = {}
+        self.cam_transport_labels = {}
+        self.cam_rtsp_labels = {}
+        self._apply_rtsp_transport_from_config()
+
+        token = self.config["TELEGRAM"].get("bot_token", "")
+        chat_id = self.config["TELEGRAM"].get("chat_id", "")
+        self.telegram = TelegramBot(token, chat_id, self.log)
+        self.log.set_telegram(self.telegram)
+
+        self.detectors: Dict[int, RTSPObjectDetector] = {}
+        self.threads: Dict[int, threading.Thread] = {}
+        self.running = False
+
+        # Watchdog (monotonic)
+        self.watchdog_interval_ms = 2000
+        self.watchdog_no_frame_s = 20.0  # Aumentado de 12s para 20s (rede instável)
+        self.watchdog_restart_backoff_s = 10.0
+        self._last_restart_mono: Dict[int, float] = {}
+
+        self._last_daily_restart_date = None
+
+        self.notebook = ttk.Notebook(self.root)
+        self.notebook.pack(fill="both", expand=True, padx=5, pady=5)
+
+        self.frame_video = ttk.Frame(self.notebook)
+        self.notebook.add(self.frame_video, text="Vídeo (Mosaico 2x2)")
+        self._build_video_mosaic()
+        self._apply_rtsp_transport_from_config()
+
+        self.frame_config = ttk.Frame(self.notebook)
+        self.notebook.add(self.frame_config, text="Config")
+        self._build_config_tab()
+
+        self.frame_fotos = ttk.Frame(self.notebook)
+        self.notebook.add(self.frame_fotos, text="Fotos")
+        self._build_photos_tab()
+
+        self.frame_logs = ttk.Frame(self.notebook)
+        self.notebook.add(self.frame_logs, text="Logs")
+        self._build_logs_tab()
+
+        self.frame_about = ttk.Frame(self.notebook)
+        self.notebook.add(self.frame_about, text="Sobre")
+        self._build_about_tab()
+
+        self._load_logs_tail()
+
+        self._process_queues()
         self.log.log("INFO", "UI initialized successfully")
 
         self.root.after(600, self.start_system)
@@ -1468,10 +1493,16 @@ class InterfaceGrafica:
                 "photos_per_event": "2",
                 "classes_enabled": "person",
                 "min_capture_interval_s": "1.0",
+                "presence_exit_timeout_s": "3.0",
+                "presence_mid_alert_after_s": "20.0",
+                "presence_min_move_px": "25.0",
+                "presence_enter_confirm_frames": "3",
+                "presence_exit_confirm_frames": "10",
+                "presence_rearm_radius_px": "90.0",
+                "presence_rearm_clear_absence_s": "8.0",
                 "skip_frames": "2",  # Pula 2 frames (processa 1 a cada 3) - melhora performance
                 "input_size": "320",  # Resolução YOLO (320=rápido, 416=preciso, 608=lento)
                 "rtsp_transport": "udp",  # UDP (padrão) ou TCP
-                "jpeg_quality": "100",  # Qualidade JPEG do Telegram
             },
             "TELEGRAM": {
                 "bot_token": "",
@@ -1529,7 +1560,6 @@ class InterfaceGrafica:
         self.config["DETECTOR"]["min_capture_interval_s"] = self.sp_min_capture.get().strip()
         self.config["DETECTOR"]["rtsp_transport"] = self.cb_rtsp_transport.get().strip().lower()
         self.config["DETECTOR"]["max_photos_keep"] = self.sp_max_photos.get().strip()
-        self.config["DETECTOR"]["jpeg_quality"] = self.sp_jpeg_quality.get().strip()
 
         enabled = []
         if self.var_person.get(): enabled.append("person")
@@ -1630,7 +1660,7 @@ class InterfaceGrafica:
             ttk.Label(header, text=f"CAM{cam_id}", font=("Arial", 10, "bold")).pack(side="left", padx=(0, 2), pady=2)
 
             # RTSP transport label
-            transport = self.config["DETECTOR"].get("rtsp_transport", "udp").strip().upper() if "DETECTOR" in self.config else "UDP"
+            transport = self.config["DETECTOR"].get("rtsp_transport", "udp").strip().upper()
             self.cam_transport_labels[cam_id] = ttk.Label(header, text=f"({transport})", foreground="#666666")
             self.cam_transport_labels[cam_id].pack(side="left", padx=(0, 6), pady=2)
 
@@ -1797,14 +1827,6 @@ class InterfaceGrafica:
         self._add_tooltip_to_widget(lbl_max_photos, CONFIGURATION_TIPS["max_photos"])
         self._add_tooltip_to_widget(self.sp_max_photos, CONFIGURATION_TIPS["max_photos"])
 
-        lbl_jpeg_quality = ttk.Label(det, text="Qualidade JPEG:")
-        lbl_jpeg_quality.grid(row=2, column=0, sticky="w")
-        self.sp_jpeg_quality = ttk.Spinbox(det, from_=50, to=100, increment=1, width=6)
-        self.sp_jpeg_quality.grid(row=2, column=1, padx=6, pady=4, sticky="w")
-        self.sp_jpeg_quality.set(self.config["DETECTOR"].get("jpeg_quality", "100"))
-        self._add_tooltip_to_widget(lbl_jpeg_quality, CONFIGURATION_TIPS["jpeg_quality"])
-        self._add_tooltip_to_widget(self.sp_jpeg_quality, CONFIGURATION_TIPS["jpeg_quality"])
-
         # ========== CLASSES ==========
         cls = ttk.LabelFrame(wrap, text="Classes (somente pessoa dispara alerta)", padding=10)
         cls.pack(fill="x", pady=8)
@@ -1923,8 +1945,6 @@ class InterfaceGrafica:
                 self._show_tooltip_on_hover(widget, tip_text)
             else:
                 self._hide_tooltip(widget)
-        if not show_tips:
-            self._hide_perf_header_tooltip()
 
     def _show_tooltip_on_hover(self, widget, text):
         """Mostra tooltip ao passar mouse sobre widget"""
@@ -1968,62 +1988,10 @@ class InterfaceGrafica:
         self.photos_canvas.create_window((0, 0), window=self.photos_wrap, anchor="nw")
         self.photos_canvas.configure(yscrollcommand=self.photos_scroll.set)
 
-        # Habilitar scroll com mouse wheel
-        def _on_mousewheel(event):
-            self.photos_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
-        
-        self.photos_canvas.bind_all("<MouseWheel>", _on_mousewheel)
-
         self.photos_canvas.pack(side="left", fill="both", expand=True)
         self.photos_scroll.pack(side="right", fill="y")
 
         self.thumb_items = []
-
-    def _load_existing_photos(self):
-        """Carrega fotos existentes do diretório ao iniciar."""
-        try:
-            foto_dir = Path("fotos")
-            if not foto_dir.exists():
-                return
-            
-            # Buscar todas as fotos (exceto crops)
-            photos = sorted(foto_dir.glob("*_CAM*_EVT*_S*.jpg"), key=lambda p: p.stat().st_mtime, reverse=True)
-            
-            # Filtrar apenas fotos principais (não crops)
-            main_photos = [p for p in photos if not p.name.endswith("_crop.jpg")]
-            
-            # Carregar fotos na interface
-            for photo_path in main_photos:
-                try:
-                    # Parse do filename: YYYYMMDD_HHMMSS_CAMX_EVTXXX_SX.jpg
-                    name = photo_path.stem
-                    parts = name.split("_")
-                    
-                    if len(parts) < 5:
-                        continue
-                    
-                    ts = f"{parts[0]}_{parts[1]}"  # YYYYMMDD_HHMMSS
-                    cam_part = parts[2]  # CAMX
-                    evt_part = parts[3]  # EVTXXX
-                    shot_part = parts[4]  # SX
-                    
-                    # Extrair IDs
-                    cam_id = int(cam_part.replace("CAM", ""))
-                    event_uid = evt_part.replace("EVT", "")
-                    shot_idx = int(shot_part.replace("S", ""))
-                    
-                    # Verificar se existe crop correspondente
-                    crop_path = foto_dir / f"{name}_crop.jpg"
-                    crop_str = str(crop_path) if crop_path.exists() else None
-                    
-                    # Adicionar à interface
-                    self._add_thumbnail(cam_id, str(photo_path), ts, event_uid, shot_idx, crop_str)
-                    
-                except Exception as e:
-                    self.log.log("WARN", f"Erro ao carregar foto {photo_path.name}: {e}")
-                    
-        except Exception as e:
-            self.log.log("ERROR", f"Erro ao carregar fotos existentes: {e}")
 
     def _build_logs_tab(self):
         # Frame superior para controles
@@ -2058,169 +2026,9 @@ class InterfaceGrafica:
         self.text_logs.tag_config("ERROR", foreground="#FF0000")  # Vermelho
         self.text_logs.tag_config("WARN", foreground="#FF8C00")   # Laranja escuro
 
-    def _build_performance_tab(self):
-        columns = ("Câmera", "FPS", "Tx (Mbps/MB/s)", "Latência (ms)", "Jitter (ms)", "Ping (ms)", "Perda (%)", "Proto", "CPU (%)", "RAM (%)")
-        self.perf_tree = ttk.Treeview(self.frame_performance, columns=columns, show="headings", height=6)
-
-        col_widths = {"Câmera": 80, "FPS": 60, "Tx (Mbps/MB/s)": 120, "Latência (ms)": 90, "Jitter (ms)": 80,
-                      "Ping (ms)": 70, "Perda (%)": 70, "Proto": 60, "CPU (%)": 60, "RAM (%)": 60}
-        
-        for col in columns:
-            self.perf_tree.heading(col, text=col)
-            self.perf_tree.column(col, width=col_widths.get(col, 80), anchor="center")
-
-        scrollbar = ttk.Scrollbar(self.frame_performance, orient="vertical", command=self.perf_tree.yview)
-        self.perf_tree.configure(yscrollcommand=scrollbar.set)
-
-        self.perf_tree.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
-
-        for cam in range(1, 5):
-            self.perf_tree.insert("", "end", iid=f"cam{cam}", values=(f"Câmera {cam}", "--", "--", "--", "--", "--", "--", "--", "--", "--"))
-        self.perf_tree.insert("", "end", iid="system", values=("Sistema", "--", "--", "--", "--", "--", "--", "--", "--", "--"))
-
-        self._setup_performance_header_tooltips()
-
-    def _setup_performance_header_tooltips(self):
-        self.perf_header_tips = {
-            "Câmera": "Identificação da câmera.",
-            "FPS": "Frames por segundo (taxa de quadros recebidos).",
-            "Tx (Mbps/MB/s)": "Taxa de transferência estimada do stream em Mbps e MB/s (estimativa por compressão JPEG dos frames).",
-            "Latência (ms)": "Tempo de processamento do frame (captura → detecção).",
-            "Jitter (ms)": "Variação do intervalo entre frames (estabilidade do stream).",
-            "Ping (ms)": "Tempo de resposta de rede até o host da câmera.",
-            "Perda (%)": "Percentual estimado de perda de frames.",
-            "Proto": "Protocolo RTSP em uso (UDP/TCP).",
-            "CPU (%)": "Uso de CPU do processo.",
-            "RAM (%)": "Uso de memória do processo."
-        }
-        self._perf_header_tooltip = None
-        self._perf_header_current = None
-        self.perf_tree.bind("<Motion>", self._on_perf_header_motion)
-        self.perf_tree.bind("<Leave>", self._on_perf_header_leave)
-
-    def _on_perf_header_motion(self, event):
-        if not getattr(self, "var_show_tips", None) or not self.var_show_tips.get():
-            self._hide_perf_header_tooltip()
-            return
-
-        region = self.perf_tree.identify_region(event.x, event.y)
-        if region != "heading":
-            self._hide_perf_header_tooltip()
-            return
-
-        col_id = self.perf_tree.identify_column(event.x)  # ex: #1
-        try:
-            col_index = int(col_id.replace("#", "")) - 1
-        except Exception:
-            self._hide_perf_header_tooltip()
-            return
-
-        columns = list(self.perf_tree["columns"])
-        if col_index < 0 or col_index >= len(columns):
-            self._hide_perf_header_tooltip()
-            return
-
-        col_name = columns[col_index]
-        tip = self.perf_header_tips.get(col_name)
-        if not tip:
-            self._hide_perf_header_tooltip()
-            return
-
-        if self._perf_header_current != col_name:
-            self._perf_header_current = col_name
-            self._show_perf_header_tooltip(event.x_root + 10, event.y_root + 10, tip)
-
-    def _on_perf_header_leave(self, event):
-        self._hide_perf_header_tooltip()
-
-    def _show_perf_header_tooltip(self, x, y, text):
-        self._hide_perf_header_tooltip()
-        tooltip = tk.Toplevel()
-        tooltip.wm_overrideredirect(True)
-        tooltip.wm_geometry(f"+{x}+{y}")
-        label = tk.Label(
-            tooltip,
-            text=text,
-            background="#ffffe0",
-            relief="solid",
-            borderwidth=1,
-            wraplength=300,
-            justify="left",
-            font=("Arial", 9)
-        )
-        label.pack()
-        self._perf_header_tooltip = tooltip
-
-    def _hide_perf_header_tooltip(self):
-        if self._perf_header_tooltip is not None:
-            try:
-                self._perf_header_tooltip.destroy()
-            except Exception:
-                pass
-        self._perf_header_tooltip = None
-        self._perf_header_current = None
-
-    def _update_performance(self):
-        try:
-            global_cpu = 0.0
-            global_ram = 0.0
-            count = 0
-            for cam in range(1, 5):
-                if cam in self.detectors and hasattr(self.detectors[cam], "last_performance"):
-                    perf = self.detectors[cam].last_performance
-                    fps = perf.get("fps", 0)
-                    cpu = perf.get("cpu", 0)
-                    ram = perf.get("ram", 0)
-                    latency = perf.get("latency", 0)
-                    jitter = perf.get("jitter", 0)
-                    ping = perf.get("ping", 0)
-                    frame_loss = perf.get("frame_loss", 0)
-                    protocol = perf.get("protocol", "?")
-                    
-                    # Tentar usar bitrate do Network Monitor, caso contrário usar o calculado internamente
-                    bitrate_real = self.network_monitor.get_bitrate(cam) if hasattr(self.network_monitor, "get_bitrate") else 0
-                    if bitrate_real == 0:
-                        # Fallback: usar bitrate calculado internamente
-                        bitrate_mbs = perf.get("bitrate", 0) / 8.0 if perf.get("bitrate", 0) > 0 else 0.0
-                    else:
-                        bitrate_mbs = bitrate_real / 1_000_000
-                    bitrate_mbps = bitrate_mbs * 8.0
-
-                    fps_text = f"{fps:.1f}" + (" ⚠" if fps < 10 else "")
-                    bitrate_text = f"{bitrate_mbps:.2f}Mbps ({bitrate_mbs:.2f}MB/s)" if bitrate_mbps > 0 else "--"
-                    latency_text = f"{latency:.0f}ms" + (" ⚠" if latency > 100 else "") if latency > 0 else "--"
-                    jitter_text = f"{jitter:.0f}ms" + (" ⚠" if jitter > 30 else "") if jitter > 0 else "--"
-                    ping_text = f"{ping:.0f}ms" + (" ⚠" if ping > 100 else "") if ping > 0 else "--"
-                    loss_text = f"{frame_loss:.1f}%" + (" ⚠" if frame_loss > 5 else "") if frame_loss > 0 else "--"
-                    cpu_text = f"{cpu:.0f}%" + (" ⚠" if cpu > 80 else "")
-                    ram_text = f"{ram:.0f}%" + (" ⚠" if ram > 80 else "")
-
-                    self.perf_tree.item(f"cam{cam}", values=(
-                        f"Câmera {cam}", fps_text, bitrate_text, latency_text, jitter_text, 
-                        ping_text, loss_text, protocol, cpu_text, ram_text
-                    ))
-
-                    global_cpu += cpu
-                    global_ram += ram
-                    count += 1
-                else:
-                    self.perf_tree.item(f"cam{cam}", values=(f"Câmera {cam}", "--", "--", "--", "--", "--", "--", "--", "--", "--"))
-
-            if count > 0:
-                global_cpu /= count
-                global_ram /= count
-
-            self.perf_tree.item("system", values=(
-                "Sistema", "--", "--", "--", "--", "--", "--", "--", f"{global_cpu:.0f}%", f"{global_ram:.0f}%"
-            ))
-        except Exception:
-            pass
-
-        self.root.after(1000, self._update_performance)
-
     def _build_about_tab(self):
         ttk.Label(self.frame_about, text=f"Versão: {APP_VERSION}", font=("Arial", 12, "bold")).pack(pady=10)
+        ttk.Label(self.frame_about, text=f"Commit: {get_commit_code()}", font=("Arial", 10)).pack(pady=2)
         ttk.Label(self.frame_about, text="Autor: Fabio Bettio", font=("Arial", 10)).pack(pady=5)
         ttk.Label(self.frame_about, text="Data:           02/02/2026", font=("Arial", 10)).pack(pady=5)
         ttk.Label(self.frame_about, text="Licença: Uso educacional/experimental", font=("Arial", 10)).pack(pady=5)
@@ -2239,7 +2047,7 @@ class InterfaceGrafica:
 
         ttk.Label(
             self.frame_about,
-            text="Recursos: detecção em tempo real, grupos por evento, métricas de performance, "
+            text="Recursos: detecção em tempo real, grupos por evento,  "
                  "controle de falsos positivos e captura persistente de fotos.",
             font=("Arial", 10),
             wraplength=520,
@@ -2291,8 +2099,7 @@ class InterfaceGrafica:
             return bool(self.var_log_warn.get())
         if level == "INFO":
             return bool(self.var_log_info.get())
-        # Linhas sem nível identificado são tratadas como INFO
-        return bool(self.var_log_info.get())
+        return True
 
     def _refresh_logs_view(self):
         if not hasattr(self, "text_logs"):
@@ -2547,17 +2354,18 @@ class InterfaceGrafica:
         # Verificar se é um novo dia para adicionar separador
         current_day = dt.date()
         if self.last_day_shown is not None and current_day != self.last_day_shown:
-            # Adicionar linha separadora horizontal entre dias
+            # Adicionar linha separadora entre dias
+            row = 0
             separator = tk.Frame(self.photos_wrap, height=3, bg="black")
-            separator.grid(row=len(self.thumb_groups_order), column=0, sticky="ew", padx=0, pady=5)
+            separator.grid(row=row, column=0, sticky="ew", padx=0, pady=5)
             
-            # Atualizar row de todos os grupos existentes (deslocar para baixo)
-            for i, other_uid in enumerate(self.thumb_groups_order):
+            # Deslocar todos os grupos existentes
+            for other_uid in self.thumb_groups_order:
                 g_existing = self.thumb_groups_by_uid[other_uid]
-                g_existing["row"] = i + 1
+                g_existing["row"] += 1
                 g_existing["thumbs_frame"].master.grid(row=g_existing["row"], column=0, sticky="w", padx=8, pady=10)
             
-            row = len(self.thumb_groups_order) + 1
+            row = 1
         else:
             row = 0
         
@@ -2567,9 +2375,9 @@ class InterfaceGrafica:
         self.thumb_groups_order.insert(0, uid)
         
         # Atualizar row de todos os grupos existentes (deslocar para baixo)
-        for i, other_uid in enumerate(self.thumb_groups_order[1:], start=1):
+        for other_uid in self.thumb_groups_order[1:]:
             g_existing = self.thumb_groups_by_uid[other_uid]
-            g_existing["row"] = i
+            g_existing["row"] += 1
             g_existing["thumbs_frame"].master.grid(row=g_existing["row"], column=0, sticky="w", padx=8, pady=10)
 
         g_frame = ttk.Frame(self.photos_wrap)
@@ -2663,10 +2471,16 @@ class InterfaceGrafica:
         det.telegram_mode = self.config["TELEGRAM"].get("alert_mode", "detections")
         det.photos_per_event = int(self.config["DETECTOR"].get("photos_per_event", "2"))
         det.min_capture_interval_s = float(self.config["DETECTOR"].get("min_capture_interval_s", "1.0"))
+        det.presence_exit_timeout_s = float(self.config["DETECTOR"].get("presence_exit_timeout_s", "3.0"))
+        det.presence_mid_alert_after_s = float(self.config["DETECTOR"].get("presence_mid_alert_after_s", "20.0"))
+        det.presence_min_move_px = float(self.config["DETECTOR"].get("presence_min_move_px", "25.0"))
+        det.presence_enter_confirm_frames = int(self.config["DETECTOR"].get("presence_enter_confirm_frames", "3"))
+        det.presence_exit_confirm_frames = int(self.config["DETECTOR"].get("presence_exit_confirm_frames", "10"))
+        det.presence_rearm_radius_px = float(self.config["DETECTOR"].get("presence_rearm_radius_px", "90.0"))
+        det.presence_rearm_clear_absence_s = float(self.config["DETECTOR"].get("presence_rearm_clear_absence_s", "8.0"))
         det.skip_frames = int(self.config["DETECTOR"].get("skip_frames", "2"))
         det.input_size = int(self.config["DETECTOR"].get("input_size", "320"))
         det.max_photos_keep = int(self.config["DETECTOR"].get("max_photos_keep", "500"))
-        det.telegram_jpeg_quality = int(self.config["DETECTOR"].get("jpeg_quality", "100"))
 
         name_to_id = {
             "person": 0, "bicycle": 1, "car": 2, "motorcycle": 3,
@@ -2698,7 +2512,7 @@ class InterfaceGrafica:
         mode = self.config["TELEGRAM"].get("alert_mode", "detections")
         if mode == "none":
             return
-        msg = self.telegram.formatar_msg_inicio(active_count, APP_VERSION)
+        msg = self.telegram.formatar_msg_inicio(active_count, APP_VERSION, get_commit_code())
         self.telegram.enviar_mensagem(msg)
 
     def _send_telegram_system_stop(self, total_detections: int):
@@ -2733,22 +2547,6 @@ class InterfaceGrafica:
             4: self.config["CAM4"].get("rtsp_url", "").strip(),
         }
 
-        # Listar URLs RTSP ativas
-        active_rtsp = [(cam_id, url) for cam_id, url in urls.items() if url]
-        if active_rtsp:
-            msg = "RTSPs ativos na inicialização:\n" + "\n".join([f"CAM{cam_id}: {url}" for cam_id, url in active_rtsp])
-        else:
-            msg = "Nenhuma URL RTSP ativa na inicialização."
-        # Envia para Telegram e loga
-        if self.telegram and self.telegram.enabled:
-            self.telegram.enviar_mensagem(msg)
-        self.log.log("INFO", msg)
-
-        # Iniciar Network Monitor para captura de taxa real
-        enabled_urls = {cam_id: url for cam_id, url in urls.items() if url}
-        self.network_monitor.start(enabled_urls)
-        self.log.log("INFO", "Network Monitor iniciado para medição de taxa real")
-
         enabled_cams = self._enabled_cams()
 
         for cam_id in (1, 2, 3, 4):
@@ -2760,7 +2558,6 @@ class InterfaceGrafica:
                 continue
 
             det = RTSPObjectDetector(cam_id, urls[cam_id], self.log, self.telegram)
-            det.network_monitor = self.network_monitor
             self._apply_detector_config(det)
 
             det.frame_callback = lambda cid, fr, q=self.frame_queue: q.put((cid, fr))
@@ -2785,13 +2582,6 @@ class InterfaceGrafica:
                 total_detections += int(getattr(det, "detections_total", 0))
             except Exception:
                 pass
-
-        # Parar Network Monitor
-        try:
-            self.network_monitor.stop()
-            self.log.log("INFO", "Network Monitor parado")
-        except Exception:
-            pass
 
         for det in list(self.detectors.values()):
             try:
@@ -2864,7 +2654,6 @@ class InterfaceGrafica:
 
         try:
             new_det = RTSPObjectDetector(cam_id, url, self.log, self.telegram)
-            new_det.network_monitor = self.network_monitor
             self._apply_detector_config(new_det)
 
             new_det.frame_callback = lambda cid, fr, q=self.frame_queue: q.put((cid, fr))
@@ -2933,12 +2722,7 @@ class InterfaceGrafica:
             foto_dir = Path("fotos")
             foto_dir.mkdir(exist_ok=True)
             foto_path = foto_dir / f"teste_telegram_{file_ts}.jpg"
-            jpeg_quality = int(self.config["DETECTOR"].get("jpeg_quality", "100"))
-            if jpeg_quality < 1:
-                jpeg_quality = 1
-            if jpeg_quality > 100:
-                jpeg_quality = 100
-            img.save(foto_path, "JPEG", quality=jpeg_quality)
+            img.save(foto_path, "JPEG", quality=85)
 
             caption = (
                 "🧪 TESTE DE DETECÇÃO\n"
@@ -3034,3 +2818,5 @@ if __name__ == "__main__":
         traceback.print_exc()
         input("Pressione Enter para sair...")
         raise
+
+
