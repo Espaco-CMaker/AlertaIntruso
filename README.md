@@ -1,6 +1,6 @@
 # AlertaIntruso - Sistema de Alarme Inteligente por Visão Computacional
 
-**Versão Atual Baseada na: 4.5.9** (20/02/2026)
+**Versão Atual Baseada na: 6.0.9** (10/03/2026)
 
 ## Descrição Geral
 
@@ -102,8 +102,8 @@ Edite `config.ini`:
 
 ## Desenvolvimento
 
-- **Versão**: 4.5.9
-- **Data**: 20/02/2026
+- **Versão**: 6.0.9
+- **Data**: 10/03/2026
 - **Autor**: Fabio Bettio
 - **Licença**: Uso educacional/experimental
 

@@ -248,7 +248,7 @@ def set_ffmpeg_capture_options(transport: str = "udp") -> None:
 
 set_ffmpeg_capture_options("udp")
 
-APP_VERSION = "6.0.0"
+APP_VERSION = "6.0.9"
 MAX_THUMBS = 200
 
 
@@ -265,6 +265,22 @@ def get_commit_code() -> str:
         )
         commit = (out or "").strip()
         return commit if commit else "N/A"
+    except Exception:
+        return "N/A"
+
+def get_branch_name() -> str:
+    """Retorna o nome da branch atual; fora do git retorna N/A."""
+    try:
+        repo_dir = Path(__file__).resolve().parent
+        out = subprocess.check_output(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            cwd=str(repo_dir),
+            stderr=subprocess.DEVNULL,
+            timeout=2,
+            text=True,
+        )
+        branch = (out or "").strip()
+        return branch if branch else "N/A"
     except Exception:
         return "N/A"
 
@@ -732,6 +748,9 @@ class RTSPObjectDetector:
         self.photos_per_event = 2
         self.max_photos_keep = 500  # Número máximo de fotos a manter
         
+        # Variável de Controle de Monitoramento (se falso, apenas exibe a câmera sem inferência)
+        self.monitorar = True
+
         # OTIMIZAÇÃO: Skip frames para reduzir carga de processamento
         # skip_frames=2 significa processar 1 frame a cada 3 (pula 2)
         self.skip_frames = 2  # Padrão: processa 1 a cada 3 frames
@@ -1132,6 +1151,15 @@ class RTSPObjectDetector:
 
         self._last_soft_reconnect_mono = now_mono
         self.log.log("WARN", f"Soft reconnect solicitado ({reason}).", self.cam_id)
+        
+        if self.telegram_mode in ("all", "detections") and self.telegram.enabled:
+            msg = (
+                f"⚠️ ALERTA DE QUEDA - Câmera {self.cam_id}\n\n"
+                f"Motivo: {reason}\n"
+                f"Iniciando procedimento de Soft Reset.\n"
+                f"v{APP_VERSION}"
+            )
+            self.telegram.enviar_mensagem(msg)
 
         try:
             if self.cap is not None:
@@ -1166,13 +1194,18 @@ class RTSPObjectDetector:
 
     def stop(self) -> None:
         self.running = False
+        try:
+            if getattr(self, "cap", None) is not None:
+                self.cap.release()
+        except Exception:
+            pass
 
     def run(self):
         self.running = True
         try:
             while self.running and (not self._connect()):
-                self.log.log("WARN", "Não conectou RTSP. Tentando novamente em 2s...", self.cam_id)
-                time.sleep(2.0)
+                self.log.log("WARN", "Não conectou RTSP. Tentando novamente em 15s...", self.cam_id)
+                time.sleep(15.0)
 
             self._log_detector_config()
 
@@ -1225,15 +1258,28 @@ class RTSPObjectDetector:
                 self.last_frame_timestamp = now_wall
                 if self.status == "online":
                     self.status = "receiving"
+                    
+                # Se 'Monitorar' estiver desativado, pular processamento YOLO e apenas mostrar imagem
+                if not getattr(self, "monitorar", True):
+                    if self.frame_callback:
+                        try:
+                            self.frame_callback(self.cam_id, frame)
+                        except Exception as e:
+                            self.log.log("ERROR", f"Erro no callback de frame: {e}", self.cam_id)
+                    continue
 
                 # OTIMIZAÇÃO: Skip de processamento YOLO (reduz carga em 66% com skip=2)
                 # Frame RAW é sempre enviado para UI, mas YOLO só processa 1 a cada (skip+1) frames
                 self._frame_skip_counter += 1
                 if self._frame_skip_counter <= self.skip_frames:
                     # Envia frame sem processamento para UI (visualização fluida)
+                    
+                    # (Borda vermelha repassada pra UI - OTIMIZACAO RESPONSIVA)
+                    borda_frame = frame.copy()
+
                     if self.frame_callback:
                         try:
-                            self.frame_callback(self.cam_id, frame)
+                            self.frame_callback(self.cam_id, borda_frame)
                         except Exception as e:
                             self.log.log("ERROR", f"Erro no callback de frame: {e}", self.cam_id)
                     continue  # Pula processamento YOLO
@@ -1354,6 +1400,8 @@ class RTSPObjectDetector:
                             self._presence_latch_active = False
                             self._presence_latch_center = None
 
+                # (Borda vermelha repassada pra UI - OTIMIZACAO RESPONSIVA)
+
                 if self.frame_callback:
                     try:
                         self.frame_callback(self.cam_id, frame_draw)
@@ -1417,6 +1465,7 @@ class InterfaceGrafica:
         self.cam_status_labels = {}
         self.cam_transport_labels = {}
         self.cam_rtsp_labels = {}
+        self.cam_monitorar_vars = {} # Nova variável de controle
         self._apply_rtsp_transport_from_config()
 
         token = self.config["TELEGRAM"].get("bot_token", "")
@@ -1482,10 +1531,10 @@ class InterfaceGrafica:
     # ---------------- CONFIG ----------------
     def _load_or_create_config(self):
         defaults = {
-            "CAM1": {"enabled": "True", "rtsp_url": "rtsp://admin:senha@192.168.1.100:554/stream1"},
-            "CAM2": {"enabled": "True", "rtsp_url": "rtsp://admin:senha@192.168.1.101:554/stream1"},
-            "CAM3": {"enabled": "True", "rtsp_url": "rtsp://admin:senha@192.168.1.102:554/stream1"},
-            "CAM4": {"enabled": "True", "rtsp_url": "rtsp://admin:senha@192.168.1.103:554/stream1"},
+            "CAM1": {"enabled": "True", "rtsp_url": "rtsp://admin:senha@192.168.1.100:554/stream1", "monitorar": "True"},
+            "CAM2": {"enabled": "True", "rtsp_url": "rtsp://admin:senha@192.168.1.101:554/stream1", "monitorar": "True"},
+            "CAM3": {"enabled": "True", "rtsp_url": "rtsp://admin:senha@192.168.1.102:554/stream1", "monitorar": "True"},
+            "CAM4": {"enabled": "True", "rtsp_url": "rtsp://admin:senha@192.168.1.103:554/stream1", "monitorar": "True"},
             "DETECTOR": {
                 "cooldown": "2",
                 "confidence_threshold": "0.5",
@@ -1544,9 +1593,13 @@ class InterfaceGrafica:
 
     def _save_config(self):
         self.config["CAM1"]["enabled"] = str(bool(self.var_cam1.get()))
+        self.config["CAM1"]["monitorar"] = str(bool(self.cam_monitorar_vars[1].get()))
         self.config["CAM2"]["enabled"] = str(bool(self.var_cam2.get()))
+        self.config["CAM2"]["monitorar"] = str(bool(self.cam_monitorar_vars[2].get()))
         self.config["CAM3"]["enabled"] = str(bool(self.var_cam3.get()))
+        self.config["CAM3"]["monitorar"] = str(bool(self.cam_monitorar_vars[3].get()))
         self.config["CAM4"]["enabled"] = str(bool(self.var_cam4.get()))
+        self.config["CAM4"]["monitorar"] = str(bool(self.cam_monitorar_vars[4].get()))
 
         self.config["CAM1"]["rtsp_url"] = self.e_rtsp1.get().strip()
         self.config["CAM2"]["rtsp_url"] = self.e_rtsp2.get().strip()
@@ -1702,8 +1755,11 @@ class InterfaceGrafica:
         wrap = ttk.Frame(canvas)
 
         wrap.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
-        canvas.create_window((0, 0), window=wrap, anchor="nw")
+        canvas_window = canvas.create_window((0, 0), window=wrap, anchor="nw")
         canvas.configure(yscrollcommand=scrollbar.set)
+
+        # Atualiza a largura do frame `wrap` sempre que o Canvas for redimensionado (Responsividade)
+        canvas.bind("<Configure>", lambda e: canvas.itemconfig(canvas_window, width=e.width))
 
         # Mouse wheel scroll
         def on_mousewheel(event):
@@ -1735,30 +1791,45 @@ class InterfaceGrafica:
         ttk.Label(tips_frame, text="— Ative para exibir explicações de cada parâmetro", foreground="gray").pack(side="left", padx=10)
 
         # ========== CÂMERAS ==========
-        rt = ttk.LabelFrame(wrap, text="Câmeras (ativar/desativar) + RTSP", padding=10)
+        rt = ttk.LabelFrame(wrap, text="Câmeras (ativar/desativar) + RTSP + Controles", padding=10)
         rt.pack(fill="x", pady=8)
 
-        def cam_row(row, label, var_enable, entry):
+        def cam_row(row, label, var_enable, entry, cam_id):
             cb = ttk.Checkbutton(rt, text=label, variable=var_enable)
             cb.grid(row=row, column=0, sticky="w", padx=4)
             entry.grid(row=row, column=1, padx=6, pady=4, sticky="we")
             self._add_tooltip_to_widget(cb, CONFIGURATION_TIPS["cam_enabled"])
             self._add_tooltip_to_widget(entry, CONFIGURATION_TIPS["cam_rtsp"])
 
+            # Checkbox de Monitoramento persistente
+            self.cam_monitorar_vars[cam_id] = tk.BooleanVar(value=self.config[f"CAM{cam_id}"].getboolean("monitorar", fallback=True))
+            chk_monitorar = ttk.Checkbutton(
+                rt, text="Monitorar (Analítico)", variable=self.cam_monitorar_vars[cam_id],
+                command=lambda cid=cam_id: self._on_monitorar_toggled(cid)
+            )
+            chk_monitorar.grid(row=row, column=2, padx=4, sticky="w")
+            
+            # Botão Reboot
+            btn_reboot = ttk.Button(
+                rt, text="Reboot", width=10,
+                command=lambda cid=cam_id: self._trigger_camera_reboot(cid)
+            )
+            btn_reboot.grid(row=row, column=3, padx=10, sticky="w")
+
         self.var_cam1 = tk.BooleanVar(value=self.config["CAM1"].getboolean("enabled", fallback=True))
         self.var_cam2 = tk.BooleanVar(value=self.config["CAM2"].getboolean("enabled", fallback=True))
         self.var_cam3 = tk.BooleanVar(value=self.config["CAM3"].getboolean("enabled", fallback=True))
         self.var_cam4 = tk.BooleanVar(value=self.config["CAM4"].getboolean("enabled", fallback=True))
 
-        self.e_rtsp1 = ttk.Entry(rt, width=100)
-        self.e_rtsp2 = ttk.Entry(rt, width=100)
-        self.e_rtsp3 = ttk.Entry(rt, width=100)
-        self.e_rtsp4 = ttk.Entry(rt, width=100)
+        self.e_rtsp1 = ttk.Entry(rt, width=45)
+        self.e_rtsp2 = ttk.Entry(rt, width=45)
+        self.e_rtsp3 = ttk.Entry(rt, width=45)
+        self.e_rtsp4 = ttk.Entry(rt, width=45)
 
-        cam_row(0, "CAM1", self.var_cam1, self.e_rtsp1)
-        cam_row(1, "CAM2", self.var_cam2, self.e_rtsp2)
-        cam_row(2, "CAM3", self.var_cam3, self.e_rtsp3)
-        cam_row(3, "CAM4", self.var_cam4, self.e_rtsp4)
+        cam_row(0, "CAM1", self.var_cam1, self.e_rtsp1, 1)
+        cam_row(1, "CAM2", self.var_cam2, self.e_rtsp2, 2)
+        cam_row(2, "CAM3", self.var_cam3, self.e_rtsp3, 3)
+        cam_row(3, "CAM4", self.var_cam4, self.e_rtsp4, 4)
 
         rt.columnconfigure(1, weight=1)
 
@@ -2028,6 +2099,7 @@ class InterfaceGrafica:
 
     def _build_about_tab(self):
         ttk.Label(self.frame_about, text=f"Versão: {APP_VERSION}", font=("Arial", 12, "bold")).pack(pady=10)
+        ttk.Label(self.frame_about, text=f"Branch: {get_branch_name()}", font=("Arial", 10)).pack(pady=2)
         ttk.Label(self.frame_about, text=f"Commit: {get_commit_code()}", font=("Arial", 10)).pack(pady=2)
         ttk.Label(self.frame_about, text="Autor: Fabio Bettio", font=("Arial", 10)).pack(pady=5)
         ttk.Label(self.frame_about, text="Data:           02/02/2026", font=("Arial", 10)).pack(pady=5)
@@ -2194,6 +2266,12 @@ class InterfaceGrafica:
             nh = int(nw / aspect)
 
         frame_resized = cv2.resize(frame_bgr, (max(1, nw), max(1, nh)))
+
+        # Se Monitoramento ATIVO (checkbox marcado), desenhar borda responsiva na imagem final com 2px
+        if self.cam_monitorar_vars[cam_id].get():
+            h_f, w_f = frame_resized.shape[:2]
+            cv2.rectangle(frame_resized, (0, 0), (w_f - 1, h_f - 1), (0, 0, 255), 2)
+
         rgb = cv2.cvtColor(frame_resized, cv2.COLOR_BGR2RGB)
         img = Image.fromarray(rgb)
         imgtk = ImageTk.PhotoImage(img)
@@ -2524,6 +2602,64 @@ class InterfaceGrafica:
         msg = self.telegram.formatar_msg_encerramento(total_detections, APP_VERSION)
         self.telegram.enviar_mensagem(msg)
 
+    def _on_monitorar_toggled(self, cam_id: int):
+        # Atualiza a flag de monitoramento no detector em tempo real
+        if hasattr(self, "detectors") and cam_id in self.detectors:
+            self.detectors[cam_id].monitorar = self.cam_monitorar_vars[cam_id].get()
+            status = "ATIVADO" if self.detectors[cam_id].monitorar else "DESATIVADO"
+            self.log.log("INFO", f"Monitoramento modificado para: {status}", cam_id)
+
+    def _trigger_camera_reboot(self, cam_id: int):
+        import re
+        import urllib.request
+        from urllib.error import URLError, HTTPError
+        
+        rtsp_url = self.config[f"CAM{cam_id}"].get("rtsp_url", "").strip()
+        if not rtsp_url:
+            messagebox.showwarning("Reboot", f"Nenhuma URL RTSP configurada para a Câmera {cam_id}.")
+            return
+            
+        # Regex para extrair usuário, senha e IP de rtsp://user:pass@ip:port/...
+        # Opcionalmente pode não ter :porta.
+        match = re.search(r"rtsp://([^:]+):([^@]+)@([^:/]+)", rtsp_url)
+        if not match:
+            messagebox.showerror("Reboot", f"URL RTSP inválida para extrair IP/Credenciais da Câmera {cam_id}.\nFormato esperado: rtsp://user:pass@IP...")
+            return
+            
+        user = match.group(1)
+        pwd = match.group(2)
+        ip = match.group(3)
+        
+        # O usuário confirmou?
+        if not messagebox.askyesno("Reboot Computador", f"Tem certeza que deseja forçar o System Reboot da Câmera {cam_id}?\nIP Alvo: {ip}"):
+            return
+            
+        self.log.log("WARN", f"Enviando comando de Reboot via HTTP para {ip}...", cam_id)
+        
+        # Enviar de forma assíncrona pra não congelar o Tkinter
+        def reboot_task():
+            try:
+                # Monta a URL CGI baseada no comando pedido pelo cliente
+                cgi_url = f"http://{ip}/cgi-bin/hi3510/param.cgi?cmd=sysreboot&-usr={user}&-pwd={pwd}"
+                
+                # Executa request limitando o tempo para falhas
+                response = requests.get(cgi_url, timeout=5)
+                
+                if response.status_code == 200:
+                    self.log.log("INFO", f"Comando CGI de Reboot aceito com sucesso ({response.status_code})!", cam_id)
+                    # Opcionalmente, podemos notificar no Telegram
+                    if getattr(self, "telegram", None) and self.telegram.enabled:
+                         self.telegram.enviar_mensagem(f"🔄 COMANDO CGI REBOOT\n\nA câmera {cam_id} ({ip}) acaba de receber um Reboot manual de sistema via Interface Gráfica.")
+                else:
+                    self.log.log("ERROR", f"A Câmera recusou o HTTP CGI de Reboot (Status Code: {response.status_code}).", cam_id)
+            except Exception as e:
+                self.log.log("ERROR", f"Falha de Conexão CGI para o Reboot: {str(e)}", cam_id)
+                if getattr(self, "telegram", None) and self.telegram.enabled:
+                     self.telegram.enviar_mensagem(f"❌ ESFORÇO DE REBOOT FALHOU\n\nErro de rede CGI na câmera {cam_id} ({ip}):\n{str(e)}")
+                     
+        th = threading.Thread(target=reboot_task, daemon=True)
+        th.start()
+
     def start_system(self):
         if self.running:
             return
@@ -2559,6 +2695,11 @@ class InterfaceGrafica:
 
             det = RTSPObjectDetector(cam_id, urls[cam_id], self.log, self.telegram)
             self._apply_detector_config(det)
+            
+            if cam_id in self.cam_monitorar_vars:
+                det.monitorar = self.cam_monitorar_vars[cam_id].get()
+            else:
+                det.monitorar = True
 
             det.frame_callback = lambda cid, fr, q=self.frame_queue: q.put((cid, fr))
             det.photo_callback = lambda cid, path, ts, event_uid, shot_idx, crop_path, q=self.photo_queue: q.put((cid, path, ts, event_uid, shot_idx, crop_path))
@@ -2592,7 +2733,8 @@ class InterfaceGrafica:
         for th in list(self.threads.values()):
             try:
                 if th.is_alive():
-                    th.join(timeout=0.5)
+                    # Mais tempo para a thread do OpenCV desamarrar tcp/rtsp com cap.release()
+                    th.join(timeout=2.0)
             except Exception:
                 pass
 
@@ -2760,6 +2902,16 @@ class InterfaceGrafica:
                     delta = now_mono - last_mono
                     if delta > (self.watchdog_no_frame_s * 2):
                         self.log.log("WARN", f"Watchdog: sem frame {delta:.0f}s -> hard restart", cam_id)
+                        
+                        if getattr(self, "telegram", None) and self.telegram.enabled:
+                           msg_hard = (
+                               f"🚨 FALHA CRÍTICA - Câmera {cam_id}\n\n"
+                               f"Sem resposta por {delta:.0f}s.\n"
+                               f"Iniciando intervenção (Hard Restart).\n"
+                               f"v{APP_VERSION}"
+                           )
+                           self.telegram.enviar_mensagem(msg_hard)
+
                         self._restart_single_camera(cam_id, reason="persistiu sem frame")
                         continue
 
@@ -2800,6 +2952,18 @@ class InterfaceGrafica:
 
 # ----------------------------- MAIN -----------------------------
 if __name__ == "__main__":
+    import ctypes
+    import sys
+    from tkinter import messagebox
+    
+    # Previne múltiplas instâncias no Windows usando Mutex
+    mutex = ctypes.windll.kernel32.CreateMutexW(None, False, "Alerta_Intruso_V6_SingleInstance")
+    if ctypes.windll.kernel32.GetLastError() == 183:  # ERROR_ALREADY_EXISTS
+        temp_root = tk.Tk()
+        temp_root.withdraw()
+        messagebox.showerror("Aplicativo em Execução", "O Alerta de Intruso já está aberto!\nPor favor, feche a janela em uso antes de abrir uma nova instância.")
+        sys.exit(0)
+
     try:
         os.environ["OPENCV_VIDEOIO_DEBUG"] = "0"
     except Exception:

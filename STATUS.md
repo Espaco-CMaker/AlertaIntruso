@@ -1,17 +1,29 @@
-﻿# AlertaIntruso v4.5.6 - Status Report
+﻿# AlertaIntruso v6.0.9 - Status Report
 
-**Data**: 19/02/2026  
-**Versão**: 4.5.6  
+**Data**: 10/03/2026  
+**Versão**: 6.0.9  
 **Status**: ✅ ESTÁVEL
 
 ## Sessão de Desenvolvimento
 
 ### Período
-04/02/2026 - v4.3.16 → v4.5.6 (padronização + aceite)
+04/02/2026 a 10/03/2026 - (Reformulação Profunda: UI + Core Resiliência)
 
 ### Objetivos Alcançados
 
-#### 1️⃣ Telegram Improvements
+#### 1️⃣ Mutex Lock (Prevenção de Clones)
+- ✅ Integração com a API do Windows (`CreateMutexW`).
+- ✅ Lançamento de Messagebox interativa e quebra zero na UI.
+
+#### 2️⃣ Reinício Remoto & Persistência API
+- ✅ Controle de reinício assíncrono individual via CGI-bin Hi3510 (Reboot Button).
+- ✅ Regex de Autenticação Automática extraída do URL RTSP.
+- ✅ Salvamento em `config.ini` dos checkboxes de habilitar monitoramento individual.
+
+#### 3️⃣ Responsividade + Graceful Shutdown
+- ✅ Encerramento do Event loop e invocação forçada de `cap.release()`.
+- ✅ Encolhimento dinâmico dos componentes na aba da tela de Configurações (Scrollview adaptativo ao invés de corte fixo).
+- ✅ Backoff de RTSP ampliado (2s → 15s).
 - ✅ Envio de fotos em grupo (sendMediaGroup)
 - ✅ Mensagens compactas com separadores menores
 - ✅ Watchdog e WARN não enviados ao Telegram

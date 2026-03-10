@@ -1,5 +1,14 @@
 # CHANGELOG - AlertaIntruso
 
+## v6.0.9 (10/03/2026)
+### ✅ Estabilidade e Nova Arquitetura UI
+- **NOVO**: UI totalmente responsiva (Canvas/Wrap) com estiramento elástico na ABA Configurações.
+- **NOVO**: Trava Mutex global do Windows implementada para bloquear instâncias duplicadas (Anti-clones/Porta ocupada).
+- **NOVO**: Desligamento Seguro Guiado (*Graceful Shutdown*), acionando `cap.release()` explicitamente para fechar TCP RTSP.
+- **NOVO**: Reboot individual nas câmeras via CGI-bin Hi3510 (Request Async em background).
+- **NOVO**: Botões de `Monitorar (Analítico)` e `Reboot` persistentes movidos do Mosaico (Visão principal) para a aba "Configurações".
+- **OTIMIZAÇÃO**: Delay Backoff RTSP subido de 2s para 15s para conter flooding de requisições de câmeras desconectadas na rede.
+- **OTIMIZAÇÃO**: Traço do retângulo vermelho (ROI e Alvos Câmera) agora fixo em 2px no canvas independentemente da resolução redimensionada da aba.
 ## v4.5.9 (20/02/2026)
 ### ✅ Anti-spam de alertas
 - **NOVO**: Máquina de estados de presença por câmera (ENTRADA, MEIO, SAÍDA)
