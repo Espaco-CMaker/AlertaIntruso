@@ -9,8 +9,9 @@ Este workflow descreve o processo exato a seguir sempre que o usuário declarar 
 Qualquer transição de versão experimental (hotfix, dev, test) para versão de produção (main/stable) exige a documentação explícita nos arquivos de acompanhamento e o merge seguro no GitHub, além da compilação do executável.
 
 // turbo-all
-## 1. Atualização dos Documentos Oficiais (Arquivos YAML/MD)
+## 1. Atualização dos Documentos Oficiais (Arquivos YAML/MD/Cabeçalho do Fonte)
 - Leia a versão final estabelecida pelo usuário. Ex. `v6.0.9`.
+- Abra o arquivo-fonte (script) principal Python (Ex: `AlertaIntrusoV6.py`) e altere o bloco inteiro de comentários do cabeçalho preenchendo a **Versão**, a **Data** e a pauta de novidades no log inserido dentro desse docstring superior. **SEMPRE** mantenha as documentações de topo dos scripts atualizadas rigorosamente com as métricas do Release.
 - Escreva as notas unificadas do que foi feito no topo do arquivo `CHANGELOG.md`.
 - No arquivo `README.md`, procure no topo pelas tags referentes à "Versão Atual" ou "Data" e substitua-as pela data local e versão corriqueira do dia. Atualize a seção de "Desenvolvimento > Versão" na base do documento.
 - Substitua todo o log sumário no arquivo `STATUS.md`, informando a nova data e assinalando o documento como **Estável**, listando no mesmo as novas funções introduzidas ("Objetivos Alcançados").
