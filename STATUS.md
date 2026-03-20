@@ -1,8 +1,8 @@
-﻿# AlertaIntruso v4.5.6 - Status Report
+﻿# AlertaIntruso v6.0.0 - Status Report
 
-**Data**: 19/02/2026  
-**Versão**: 4.5.6  
-**Status**: ✅ ESTÁVEL
+**Data**: 20/03/2026  
+**Versão**: 6.0.0  
+**Status**: 🚀 NOVA VERSÃO — MELHORIAS DE ROBUSTEZ EM ANDAMENTO
 
 ## Sessão de Desenvolvimento
 
@@ -113,8 +113,14 @@
 
 ---
 
-## Próximas Iterações Recomendadas
+## Novidades v6.0.0
 
+- Executável agora sempre renomeado automaticamente com o número da versão.
+- Regra global: todo build gera `AlertaIntruso-vX.Y.Z.exe`.
+- Início da implementação de reinício automático em caso de fechamento inesperado.
+- Logs aprimorados para rastrear falhas silenciosas.
+
+## Próximas Iterações Recomendadas
 1. **Analytics Dashboard**: Gráficos de detecções por hora/dia
 2. **Cloud Backup**: Enviar fotos para AWS S3/Google Drive
 3. **Object Tracking**: Rastrear pessoa entre frames

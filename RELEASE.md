@@ -1,24 +1,26 @@
-# 🎉 AlertaIntruso v4.5.5 - Release Summary
+# 🎉 AlertaIntruso v6.0.0 - Release Summary
 
-**Data de Release**: 04/02/2026  
+**Data de Release**: 20/03/2026  
 **Commits**: Atualizações contínuas  
-**Status**: ✅ Production Ready
+**Status**: 🚀 Nova versão — Robustez aprimorada
 
 ---
 
+v4.3.16 ──→ v4.5.0 ──→ v4.5.4 ──→ v4.5.5
 ## 📊 Release Overview
 
 ```
-v4.3.16 ──→ v4.5.0 ──→ v4.5.4 ──→ v4.5.5
- (Base)     (Logs+Fotos) (Logs Padron.) (Aceite)
+v4.5.9 ──→ v6.0.0
+(Anti-spam, robustez, build versionado)
 ```
 
+
 ### Estatísticas
-- **Múltiplas versões** lançadas
+- **Versão 6.0.0**: Nova regra global de build versionado
 - **6 abas** de interface funcional
 - **4 câmeras** suportadas simultaneamente
 - **10+ métricas** de performance
-- **0 bugs críticos** em produção
+- **Robustez**: Início do auto-restart e logs aprimorados
 
 ---
 
@@ -59,11 +61,15 @@ v4.3.16 ──→ v4.5.0 ──→ v4.5.4 ──→ v4.5.5
 - ✅ Protocol (UDP/TCP)
 - ✅ Alertas visuais (⚠) para valores críticos
 
+
 ### 🔐 Reliability
 - ✅ Tratamento de exceções completo
 - ✅ Log rotation (5MB + backup)
 - ✅ Config persistence
 - ✅ Recovery automático
+- 🚀 **NOVO**: Executável sempre renomeado com a versão
+- 🚀 **NOVO**: Logs aprimorados para rastrear falhas silenciosas
+- 🚀 **NOVO**: Início do auto-restart em caso de fechamento inesperado
 
 ---
 

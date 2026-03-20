@@ -1,6 +1,6 @@
 # AlertaIntruso - Sistema de Alarme Inteligente por Visão Computacional
 
-**Versão Atual Baseada na: 4.5.9** (20/02/2026)
+**Versão Atual: 6.0.0** (20/03/2026)
 
 ## Descrição Geral
 
@@ -71,10 +71,11 @@ O **AlertaIntruso** é uma aplicação desktop em Python desenvolvida para monit
 
 ## Download (Executável)
 
+
 - Página de releases: `https://github.com/Espaco-CMaker/AlertaIntruso/releases`
 - Última release: `https://github.com/Espaco-CMaker/AlertaIntruso/releases/latest`
-
-Observação: o executável versionado (`AlertaIntruso-vX.Y.Z.exe`) é publicado nos assets da release e **não** é mais versionado no Git.
+- O executável agora é sempre gerado automaticamente com o nome da versão (ex: `AlertaIntruso-v6.0.0.exe`).
+- Nova regra global: todo executável gerado será renomeado para conter a versão.
 
 ### Instalação
 1. Clone o repositório: `git clone https://github.com/Espaco-CMaker/AlertaIntruso.git`
@@ -102,8 +103,8 @@ Edite `config.ini`:
 
 ## Desenvolvimento
 
-- **Versão**: 4.5.9
-- **Data**: 20/02/2026
+- **Versão**: 6.0.0
+- **Data**: 20/03/2026
 - **Autor**: Fabio Bettio
 - **Licença**: Uso educacional/experimental
 
