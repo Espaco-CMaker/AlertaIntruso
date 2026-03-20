@@ -4,8 +4,8 @@ ALERTAINTRUSO — ALARME INTELIGENTE POR VISÃO COMPUTACIONAL (RTSP • YOLO •
 ================================================================================
 Arquivo:        AlertaIntrusoV6.py
 Projeto:        Sistema de Alarme Inteligente por Visão Computacional
-Versão:         6.0.0
-Data:           10/03/2026
+Versão:         6.0.1
+Data:           20/03/2026
 Autor:          Fabio Bettio
 Licença:        Uso educacional / experimental
 Status:         ESTÁVEL
@@ -22,6 +22,12 @@ de movimento.
 ================================================================================
 Changelog completo
 ================================================================================
+v6.0.1 (20/03/2026) [ROBUSTEZ E CORREÇÕES]
+    - NOVO: Watchdog externo com reinício automático (até 5 tentativas) ao fechar inesperadamente
+    - MELHORIA: Logs de falha/reinício/encerramento em log.txt e error.log no formato padronizado
+    - FIX: Telegram HTTP 429 respeita retry_after e reenvia em enviar_mensagem e enviar_grupo_fotos
+    - FIX: Warning cv2.setLogCallback removido — verificação prévia por hasattr
+
 v4.5.9 (20/02/2026) [ANTI-SPAM ALERTAS] (linhas: 0)
     - NOVO: Eventos de presença com ENTRADA/MEIO/SAÍDA
     - NOVO: Alerta MEIO para presença prolongada/parada
@@ -248,7 +254,7 @@ def set_ffmpeg_capture_options(transport: str = "udp") -> None:
 
 set_ffmpeg_capture_options("udp")
 
-APP_VERSION = "6.0.0"
+APP_VERSION = "6.0.1"
 MAX_THUMBS = 200
 
 
@@ -485,6 +491,21 @@ class TelegramBot:
         self.base_url = f"https://api.telegram.org/bot{self.token}" if self.enabled else ""
         self.log = log
 
+    def _wait_rate_limit(self, response) -> bool:
+        """Se resposta for HTTP 429, aguarda o tempo indicado pelo Telegram e retorna True.
+        Retorna False se não for rate limit."""
+        if response.status_code != 429:
+            return False
+        try:
+            retry_after = int(response.json().get("parameters", {}).get("retry_after", 10))
+        except Exception:
+            retry_after = 10
+        retry_after = min(retry_after + 1, 60)  # margem de 1s, máximo 60s
+        if self.log:
+            self.log.log("WARN", f"Telegram rate limit (429) — aguardando {retry_after}s antes de reenviar")
+        time.sleep(retry_after)
+        return True
+
     def enviar_mensagem(self, texto: str) -> bool:
         if not self.enabled:
             return False
@@ -494,16 +515,19 @@ class TelegramBot:
             r = requests.post(url, data=data, timeout=10)
             if r.status_code == 200:
                 return True
-            else:
-                # ERROR: resposta HTTP não-200
-                if self.log:
-                    self.log.log("ERROR", 
-                        f"Telegram sendMessage FALHOU | "
-                        f"HTTP {r.status_code} | "
-                        f"Resposta: {r.text[:200]} | "
-                        f"URL: {url} | "
-                        f"ChatID: {self.chat_id}")
-                return False
+            if self._wait_rate_limit(r):
+                r = requests.post(url, data=data, timeout=10)
+                if r.status_code == 200:
+                    return True
+            # ERROR: resposta HTTP não-200
+            if self.log:
+                self.log.log("ERROR",
+                    f"Telegram sendMessage FALHOU | "
+                    f"HTTP {r.status_code} | "
+                    f"Resposta: {r.text[:200]} | "
+                    f"URL: {url} | "
+                    f"ChatID: {self.chat_id}")
+            return False
         except requests.exceptions.Timeout as e:
             if self.log:
                 self.log.log("ERROR", 
@@ -613,16 +637,29 @@ class TelegramBot:
             r = requests.post(url, files=files, data=data, timeout=30)
             if r.status_code == 200:
                 return True
-            else:
-                if self.log:
-                    self.log.log("ERROR",
-                        f"Telegram sendMediaGroup FALHOU | "
-                        f"HTTP {r.status_code} | "
-                        f"Resposta: {r.text[:200]} | "
-                        f"Qtd: {len(fotos)} | "
-                        f"URL: {url} | "
-                        f"ChatID: {self.chat_id}")
-                return False
+            if self._wait_rate_limit(r):
+                # Reabrir arquivos para o reenvio
+                for f in files.values():
+                    try:
+                        f.close()
+                    except Exception:
+                        pass
+                files = {}
+                for i, foto_path in enumerate(fotos):
+                    attach_name = f"file{i}"
+                    files[attach_name] = open(foto_path, "rb")
+                r = requests.post(url, files=files, data=data, timeout=30)
+                if r.status_code == 200:
+                    return True
+            if self.log:
+                self.log.log("ERROR",
+                    f"Telegram sendMediaGroup FALHOU | "
+                    f"HTTP {r.status_code} | "
+                    f"Resposta: {r.text[:200]} | "
+                    f"Qtd: {len(fotos)} | "
+                    f"URL: {url} | "
+                    f"ChatID: {self.chat_id}")
+            return False
         except FileNotFoundError as e:
             if self.log:
                 self.log.log("ERROR",
@@ -1399,10 +1436,11 @@ class InterfaceGrafica:
         self.log.log("INFO", f"Working Directory: {Path.cwd()}")
         self.log.log("INFO", separator)
 
-        try:
-            cv2.setLogCallback(lambda level, msg: self.log.log("INFO", f"OpenCV [{level}]: {msg.strip()}"))
-        except Exception:
-            self.log.log("WARN", "cv2.setLogCallback não disponível. Logs do OpenCV não serão capturados.")
+        if hasattr(cv2, "setLogCallback"):
+            try:
+                cv2.setLogCallback(lambda level, msg: self.log.log("INFO", f"OpenCV [{level}]: {msg.strip()}"))
+            except Exception:
+                pass
 
         self.old_stderr = sys.stderr
         try:
@@ -2799,24 +2837,52 @@ class InterfaceGrafica:
 
 
 # ----------------------------- MAIN -----------------------------
-if __name__ == "__main__":
-    try:
-        os.environ["OPENCV_VIDEOIO_DEBUG"] = "0"
-    except Exception:
-        pass
+import time
 
-    try:
-        root = tk.Tk()
-        app = InterfaceGrafica(root)
-        root.mainloop()
-    except Exception as e:
-        import traceback
-        with open("error.log", "w", encoding="utf-8") as f:
-            f.write(f"ERRO FATAL:\n{type(e).__name__}: {e}\n\n")
-            f.write(traceback.format_exc())
-        print(f"ERRO FATAL: {type(e).__name__}: {e}")
-        traceback.print_exc()
-        input("Pressione Enter para sair...")
-        raise
+if __name__ == "__main__":
+    import traceback
+    MAX_RESTARTS = 5
+    RESTART_DELAY = 5  # segundos
+    restart_count = 0
+    while True:
+        try:
+            os.environ["OPENCV_VIDEOIO_DEBUG"] = "0"
+        except Exception:
+            pass
+
+        def _wlog(level: str, msg: str) -> None:
+            """Grava nos dois arquivos de log no formato padronizado do LogManager."""
+            ts = time.strftime("%Y-%m-%d %H:%M:%S")
+            line = f"{ts} | {level:<7} | {'watchdog':<15} | {msg}\n"
+            for fname in ("error.log", "log.txt"):
+                try:
+                    with open(fname, "a", encoding="utf-8") as f:
+                        f.write(line)
+                except Exception:
+                    pass
+
+        try:
+            root = tk.Tk()
+            app = InterfaceGrafica(root)
+            root.mainloop()
+            _wlog("INFO", "Encerramento normal da aplicação")
+            break
+        except Exception as e:
+            restart_count += 1
+            _wlog("ERROR", f"Falha fatal: {type(e).__name__}: {e} | Tentativa {restart_count}/{MAX_RESTARTS}")
+            tb_lines = traceback.format_exc().strip().splitlines()
+            for tb_line in tb_lines:
+                _wlog("ERROR", tb_line)
+            print(f"ERRO FATAL: {type(e).__name__}: {e}")
+            traceback.print_exc()
+            if restart_count >= MAX_RESTARTS:
+                print(f"Limite de {MAX_RESTARTS} reinícios atingido. Encerrando.")
+                _wlog("ERROR", f"Limite de {MAX_RESTARTS} reinícios atingido — aplicação encerrada")
+                input("Pressione Enter para sair...")
+                break
+            else:
+                print(f"Reiniciando em {RESTART_DELAY} segundos...")
+                _wlog("WARN", f"Reiniciando aplicação em {RESTART_DELAY}s (tentativa {restart_count}/{MAX_RESTARTS})")
+                time.sleep(RESTART_DELAY)
 
 

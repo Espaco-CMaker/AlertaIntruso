@@ -1,5 +1,20 @@
 # CHANGELOG - AlertaIntruso
 
+## v6.0.1 (20/03/2026)
+### 🔧 Robustez e correções
+- **NOVO**: Watchdog externo com reinício automático em até 5 tentativas ao fechar inesperadamente
+- **MELHORIA**: Logs de falha, reinício e encerramento gravados em `log.txt` e `error.log` no formato padronizado (`watchdog` como nome de logger)
+- **FIX**: Telegram HTTP 429 (rate limit) agora respeita `retry_after` e reenvia automaticamente em `enviar_mensagem` e `enviar_grupo_fotos`
+- **FIX**: Warning `cv2.setLogCallback não disponível` removido — verificação prévia por `hasattr` evita o log desnecessário
+
+## v6.0.0 (20/03/2026)
+### 🚀 Novidades e melhorias
+- **NOVO**: Geração automática do executável já renomeado com o número da versão (ex: AlertaIntruso-v6.0.0.exe)
+- **PADRÃO GLOBAL**: Sempre que um executável for gerado, ele será automaticamente renomeado para conter a versão atual.
+- **INÍCIO**: Implementação de reinício automático caso a aplicação feche inesperadamente.
+- **MELHORIA**: Logs aprimorados para identificar causas de fechamento inesperado (crash, erro silencioso, etc).
+- **PLANEJAMENTO**: Itens acima em andamento para aumentar robustez e rastreabilidade.
+
 ## v4.5.9 (20/02/2026)
 ### ✅ Anti-spam de alertas
 - **NOVO**: Máquina de estados de presença por câmera (ENTRADA, MEIO, SAÍDA)

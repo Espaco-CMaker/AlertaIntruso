@@ -2,10 +2,23 @@
 
 Este documento detalha o processo para atualizar a versão do AlertaIntruso de forma consistente.
 
+## � Regra de Versionamento Semântico (X.Y.Z)
+
+> **REGRA OBRIGATÓRIA**: O assistente (IA) só pode incrementar automaticamente o **Z (PATCH)**.
+> Os dígitos **X (MAJOR)** e **Y (MINOR)** só devem ser alterados sob **comando explícito do usuário**.
+
+| Dígito | Nome  | Quem altera       | Quando                                      |
+|--------|-------|-------------------|---------------------------------------------|
+| X      | MAJOR | Usuário (manual)  | Reescrita, mudança de arquitetura, breaking  |
+| Y      | MINOR | Usuário (manual)  | Novo recurso relevante, mudança funcional    |
+| Z      | PATCH | IA (automático)   | Bugfix, ajuste, melhoria incremental         |
+
+---
+
 ## 📋 Checklist Obrigatório para Cada Versão
 
 ### ✅ Procedimento de Aceite (sempre que validar uma versão)
-- [ ] Incrementar **PATCH** (último dígito)
+- [ ] Incrementar **PATCH** (último dígito Z apenas)
 - [ ] Atualizar docs: CHANGELOG.md, README.md, STATUS.md, RELEASE.md
 - [ ] Gerar executável versionado: `AlertaIntruso-vX.Y.Z.exe`
 - [ ] Atualizar Git (add/commit/push) com código + docs + `.spec` (sem versionar `.exe`)
