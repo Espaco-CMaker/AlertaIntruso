@@ -4,8 +4,8 @@ ALERTAINTRUSO — ALARME INTELIGENTE POR VISÃO COMPUTACIONAL (RTSP • YOLO •
 ================================================================================
 Arquivo:        AlertaIntrusoV6.py
 Projeto:        Sistema de Alarme Inteligente por Visão Computacional
-Versão:         6.0.9
-Data:           10/03/2026
+Versão:         6.1.0
+Data:           23/03/2026
 Autor:          Fabio Bettio
 Licença:        Uso educacional / experimental
 Status:         ESTÁVEL
