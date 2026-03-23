@@ -1,6 +1,6 @@
 # AlertaIntruso - Sistema de Alarme Inteligente por Visão Computacional
 
-**Versão Atual: 6.1.0** (23/03/2026)
+**Versão Atual: 6.1.1** (23/03/2026)
 
 ## Descrição
 

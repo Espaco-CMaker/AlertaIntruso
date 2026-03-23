@@ -1,7 +1,7 @@
 # AlertaIntruso v6.1.0 - Status Report
 
 **Data**: 23/03/2026  
-**Versão**: 6.1.0  
+**Versão**: 6.1.1  
 **Status**: 🟢 ESTÁVEL
 
 ## Descrição
@@ -22,7 +22,8 @@ Este documento descreve o status atual do projeto AlertaIntruso, incluindo as pr
 
 ## Planos de Desenvolvimento
 
-- **V6.1.0**: Estabilidade e melhorias de desempenho.
+- **V6.1.1**: Incremento PATCH automático.
+	- **V6.1.0**: Estabilidade e melhorias de desempenho.
 - **V6.2.0**: Integração com novas tecnologias.
 
 ## Status

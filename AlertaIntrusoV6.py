@@ -2,9 +2,10 @@
 ================================================================================
 ALERTAINTRUSO — ALARME INTELIGENTE POR VISÃO COMPUTACIONAL (RTSP • YOLO • MULTICAM)
 ================================================================================
+
 Arquivo:        AlertaIntrusoV6.py
 Projeto:        Sistema de Alarme Inteligente por Visão Computacional
-Versão:         6.1.0
+Versão:         6.1.1
 Data:           23/03/2026
 Autor:          Fabio Bettio
 Licença:        Uso educacional / experimental
@@ -257,7 +258,7 @@ def set_ffmpeg_capture_options(transport: str = "udp") -> None:
 
 set_ffmpeg_capture_options("udp")
 
-APP_VERSION = "6.1.0"
+APP_VERSION = "6.1.1"
 MAX_THUMBS = 200
 
 

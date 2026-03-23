@@ -1,5 +1,10 @@
 # CHANGELOG - AlertaIntruso
 
+
+## v6.1.1 (23/03/2026)
+### 🟢 PATCH — incremento de manutenção
+- **PATCH**: Correções e ajustes menores. Versão gerada automaticamente.
+
 ## v6.1.0 (23/03/2026)
 ### 🟢 Estável — marco de versão
 - **MAJOR**: Versão estável, início do ciclo 6.1.x. Próximos incrementos serão apenas no último dígito (PATCH).
